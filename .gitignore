@@ -1,0 +1,92 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.so
+*.dylib
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+.python-version
+pip-wheel-metadata/
+
+# Environment & secrets
+.env
+.env.*
+.venv/
+venv/
+.idea/
+.vscode/
+*.code-workspace
+
+# Notebook caches
+.ipynb_checkpoints/
+
+# Project data (tracked via placeholders)
+data/raw/
+!data/raw/.gitkeep
+data/interim/
+data/interim/*.tif
+!data/interim/.gitkeep
+data/processed/
+!data/processed/.gitkeep
+data/labels/
+!data/labels/.gitkeep
+!data/labels/points/.gitkeep
+!data/labels/masks/.gitkeep
+data/external/
+!data/external/.gitkeep
+!data/external/shapefiles/.gitkeep
+!data/external/ancillary/.gitkeep
+
+# Outputs & logs
+logs/
+!logs/.gitkeep
+experiments/
+!experiments/.gitkeep
+assets/figures/*.png
+assets/figures/*.jpg
+assets/maps/*.png
+assets/maps/*.jpg
+*.tif
+*.tiff
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.gpkg
+
+# Geemap / Earth Engine tokens
+ee_credentials/
+gee_credentials/
+
+# map
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# Raster / EO data
+*.tif
+*.tiff
+*.vrt
+*.img
+*.nc
+*.h5
+*.zarr
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Models
+*.pth
+*.ckpt
+*.onnx
