@@ -53,6 +53,37 @@ Each data subfolder contains `.gitkeep` placeholders so that the directory struc
 - Keep training/validation labels in `data/labels/points/` (vector) and `data/labels/masks/` (rasters).
 - Use `data/interim/` for temporary merges/reprojections, and `data/processed/` for final tiles, mosaics, and ML-ready feature stacks.
 
+## Example commands
+### Sentinel mosaics (Rasterio)
+```bash
+python scripts/sentinel/mosaic_sentinel_tiles.py \
+    --year 2017 \
+    --band B02 \
+    --resolution 10 \
+    --target-crs EPSG:32646 \
+    --output /media/abdul-aziz/345E19F75E19B29A/bd_coastal_tiles/2017/coastal_2017_10_B02.tif
+```
+
+### Sentinel mosaics (GDAL)
+```bash
+python scripts/sentinel/mosaic_sentinel_tiles_gdal.py \
+    --year 2017 \
+    --band B02 \
+    --resolution 10 \
+    --target-crs EPSG:32646 \
+    --output /media/abdul-aziz/345E19F75E19B29A/bd_coastal_tiles/2017/coastal_2017_10_B02.tif
+```
+
+### Clip AlphaEarth mosaic to dissolved coastal AOI
+```bash
+python scripts/clip_dissolved_coastal.py --skip-cog
+```
+
+### Clip Sentinel mosaic to solid coastal AOI
+```bash
+python scripts/clip_solid_coastal.py
+```
+
 ## Next steps
 - Integrate coastal district shapefiles and reference labels into the `data/` tree.
 - Add preprocessing notebooks or scripts to harmonize training tiles with the embeddings.
