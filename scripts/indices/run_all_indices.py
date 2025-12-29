@@ -37,6 +37,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     script_dir = Path(__file__).resolve().parent
+    failures: list[tuple[str, int]] = []
 
     for script_name in INDEX_SCRIPTS:
         script_path = script_dir / script_name
@@ -45,7 +46,15 @@ def main(argv: Sequence[str] | None = None) -> None:
 
         cmd = [sys.executable, str(script_path), "--year", str(args.year)]
         print(f"Running: {' '.join(cmd)}")
-        subprocess.run(cmd, check=True)
+        result = subprocess.run(cmd)
+        if result.returncode != 0:
+            failures.append((script_name, result.returncode))
+
+    if failures:
+        print("Completed with errors:")
+        for script_name, code in failures:
+            print(f"- {script_name}: exit code {code}")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
