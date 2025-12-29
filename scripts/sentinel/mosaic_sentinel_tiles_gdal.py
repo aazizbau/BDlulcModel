@@ -3,7 +3,8 @@ Mosaic Sentinel-2 L2A band tiles into a single GeoTIFF
 using GDAL VRT + single gdalwarp -tap (pixel-aligned).
 
 Usage:
-  python scripts/sentinel/mosaic_sentinel_tiles.py --year 2017 --band B02 --resolution 10
+  python scripts/sentinel/mosaic_sentinel_tiles.py --year 2017 --band B02 --source-resolution 10 --resolution 10
+  python scripts/sentinel/mosaic_sentinel_tiles.py --year 2017 --band B11 --source-resolution 20 --resolution 10
 """
 
 from __future__ import annotations
@@ -36,6 +37,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     p.add_argument("--base-dir", type=Path, default=default_base)
     p.add_argument("--year", type=int, required=True)
     p.add_argument("--band", default="B02")
+    p.add_argument(
+        "--source-resolution",
+        type=int,
+        choices=(10, 20, 60),
+        default=None,
+        help="Resolution of source JP2 tiles. If omitted, infer from --resolution or band.",
+    )
     p.add_argument("--resolution", type=int, choices=(10, 20, 60), default=10)
     p.add_argument("--target-crs", default="EPSG:32646")
     p.add_argument("--resampling", default="near", choices=("near", "bilinear", "cubic"))
@@ -48,17 +56,54 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 # ---------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------
-def list_band_paths(base_dir: Path, year: int, band: str, resolution: int) -> list[Path]:
+def list_band_paths(
+    base_dir: Path,
+    year: int,
+    band: str,
+    target_resolution: int,
+    source_resolution: int | None,
+) -> tuple[list[Path], int]:
     year_dir = base_dir / str(year)
     if not year_dir.exists():
         raise FileNotFoundError(year_dir)
 
-    pat = f"*_{band}_{resolution}m.jp2"
-    paths = sorted(year_dir.glob(f"**/{pat}"))
+    band_res_map = {
+        "B01": 60,
+        "B02": 10,
+        "B03": 10,
+        "B04": 10,
+        "B05": 20,
+        "B06": 20,
+        "B07": 20,
+        "B08": 10,
+        "B8A": 20,
+        "B09": 60,
+        "B10": 60,
+        "B11": 20,
+        "B12": 20,
+    }
+
+    def _find(resolution: int) -> list[Path]:
+        pat = f"*_{band}_{resolution}m.jp2"
+        return sorted(year_dir.glob(f"**/{pat}"))
+
+    if source_resolution is not None:
+        paths = _find(source_resolution)
+        resolved_source = source_resolution
+    else:
+        paths = _find(target_resolution)
+        resolved_source = target_resolution
+        if not paths:
+            fallback = band_res_map.get(band)
+            if fallback is not None and fallback != target_resolution:
+                paths = _find(fallback)
+                resolved_source = fallback
+
     if not paths:
+        pat = f"*_{band}_{target_resolution}m.jp2"
         raise RuntimeError(f"No tiles found for {pat}")
 
-    return paths
+    return paths, resolved_source
 
 
 def default_output(base_dir: Path, year: int, band: str, res: int) -> Path:
@@ -170,13 +215,17 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.base_dir, args.year, args.band, args.resolution
     )
 
-    tile_paths = list_band_paths(
-        args.base_dir, args.year, args.band, args.resolution
+    tile_paths, source_resolution = list_band_paths(
+        args.base_dir,
+        args.year,
+        args.band,
+        args.resolution,
+        args.source_resolution,
     )
 
     log(
-        f"Found {len(tile_paths)} tiles "
-        f"for band {args.band} ({args.resolution} m)"
+        f"Found {len(tile_paths)} tiles for band {args.band} "
+        f"({source_resolution} m → {args.resolution} m)"
     )
 
     run_gdal_pipeline(
