@@ -1,5 +1,8 @@
 """
 Clip the coastal Sentinel mosaic to the solid coastal AOI using GDAL streaming tools.
+
+Example:
+    python scripts/clip_solid_coastal.py --year 2017 --band B11
 """
 
 from __future__ import annotations
@@ -12,9 +15,10 @@ from pathlib import Path
 from shutil import which
 
 
-DEFAULT_RASTER = Path("/media/abdul-aziz/345E19F75E19B29A/bd_coastal_tiles/2017/coastal_2017_10_B02.tif")
+DEFAULT_BASE_DIR = Path("/media/abdul-aziz/345E19F75E19B29A/bd_coastal_tiles")
+DEFAULT_RASTER = DEFAULT_BASE_DIR / "2017" / "coastal_2017_10_B02.tif"
 DEFAULT_VECTOR = Path("/media/abdul-aziz/sdb7/masters_research/bd_coastal_map/bd_coastal_map_solid_gp.gpkg")
-DEFAULT_OUTPUT_DIR = Path("/media/abdul-aziz/345E19F75E19B29A/bd_coastal_tiles/2017")
+DEFAULT_OUTPUT_DIR = DEFAULT_BASE_DIR / "2017"
 DEFAULT_OUTPUT_NAME = "coastal_2017_10_B02_solid.tif"
 
 
@@ -38,10 +42,33 @@ def parse_args() -> argparse.Namespace:
         description="Clip the coastal Sentinel mosaic using the solid coastal AOI."
     )
     parser.add_argument(
+        "--year",
+        type=int,
+        default=None,
+        help="Year folder under the coastal tiles root (optional).",
+    )
+    parser.add_argument(
+        "--band",
+        default=None,
+        help="Band identifier like B02/B11 (optional).",
+    )
+    parser.add_argument(
+        "--base-dir",
+        type=Path,
+        default=DEFAULT_BASE_DIR,
+        help=f"Base directory for coastal mosaics (default: {DEFAULT_BASE_DIR}).",
+    )
+    parser.add_argument(
+        "--resolution",
+        type=int,
+        default=10,
+        help="Pixel resolution suffix used in filenames (default: 10).",
+    )
+    parser.add_argument(
         "--input",
         type=Path,
-        default=DEFAULT_RASTER,
-        help=f"Input raster path (default: {DEFAULT_RASTER}).",
+        default=None,
+        help="Input raster path (default: derived from --year/--band or fallback).",
     )
     parser.add_argument(
         "--vector",
@@ -52,13 +79,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=DEFAULT_OUTPUT_DIR,
-        help=f"Directory for the clipped output (default: {DEFAULT_OUTPUT_DIR}).",
+        default=None,
+        help="Directory for the clipped output (default: derived from --year or fallback).",
     )
     parser.add_argument(
         "--output-name",
-        default=DEFAULT_OUTPUT_NAME,
-        help=f"Output filename (default: {DEFAULT_OUTPUT_NAME}).",
+        default=None,
+        help="Output filename (default: derived from --year/--band or fallback).",
     )
     parser.add_argument(
         "--layer",
@@ -152,6 +179,31 @@ def main() -> None:
     ensure_tool("gdalwarp")
 
     args = parse_args()
+    if args.input is None:
+        if args.year is not None and args.band is not None:
+            args.input = (
+                args.base_dir
+                / str(args.year)
+                / f"coastal_{args.year}_{args.resolution:02d}_{args.band}.tif"
+            )
+        else:
+            args.input = DEFAULT_RASTER
+
+    if args.output_dir is None:
+        args.output_dir = (
+            args.base_dir / str(args.year)
+            if args.year is not None
+            else DEFAULT_OUTPUT_DIR
+        )
+
+    if args.output_name is None:
+        if args.year is not None and args.band is not None:
+            args.output_name = (
+                f"coastal_{args.year}_{args.resolution:02d}_{args.band}_solid.tif"
+            )
+        else:
+            args.output_name = DEFAULT_OUTPUT_NAME
+
     output = args.output_dir / args.output_name
 
     if not args.input.exists():
