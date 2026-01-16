@@ -34,6 +34,7 @@ import rasterio
 from rasterio.enums import Resampling
 from rasterio.features import geometry_mask, geometry_window
 from rasterio.transform import array_bounds
+from rasterio.errors import WindowError
 from rasterio.windows import Window
 from rasterio.warp import calculate_default_transform, reproject, transform_geom
 
@@ -106,14 +107,22 @@ def iter_blocks_in_window(ds: rasterio.DatasetReader, win: Window) -> Iterable[W
     We iterate block windows (band 1) and filter by intersection.
     """
     for _, bw in ds.block_windows(1):
-        if bw.intersection(win):
+        try:
+            bw.intersection(win)
+        except WindowError:
+            continue
+        else:
             yield bw
 
 
 def count_blocks_in_window(ds: rasterio.DatasetReader, win: Window) -> int:
     c = 0
     for _, bw in ds.block_windows(1):
-        if bw.intersection(win):
+        try:
+            bw.intersection(win)
+        except WindowError:
+            continue
+        else:
             c += 1
     return c
 
@@ -229,8 +238,9 @@ def stream_clip_same_crs(
             with rasterio.open(out_path, "w", **out_meta) as dst:
                 for bw in iter_blocks_in_window(src, aoi_win):
                     # Intersect block window with AOI window, read only intersection
-                    iw = bw.intersection(aoi_win)
-                    if iw is None:
+                    try:
+                        iw = bw.intersection(aoi_win)
+                    except WindowError:
                         continue
 
                     data = src.read(window=iw)  # shape (bands, h, w)
