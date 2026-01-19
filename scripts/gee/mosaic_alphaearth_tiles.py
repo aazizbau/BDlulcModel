@@ -83,7 +83,18 @@ def compute_mosaic_metadata(tile_paths: list[Path]) -> dict:
     transform = from_origin(minx, maxy, pixel_width, pixel_height)
 
     meta = ref_meta.copy()
-    meta.update({"width": width, "height": height, "transform": transform})
+    meta.update(
+        {
+            "width": width,
+            "height": height,
+            "transform": transform,
+            "tiled": True,
+            "blockxsize": 512,
+            "blockysize": 512,
+            "compress": "ZSTD",
+            "BIGTIFF": "IF_SAFER",
+        }
+    )
 
     if meta.get("nodata") is None:
         meta["nodata"] = 0
