@@ -1,0 +1,38 @@
+maj_class,sub_class,count,percent_within_maj
+Administrative Area,Office Compound,24,100.0
+Agricultural Land,Agroforestry,1647,38.84
+Agricultural Land,Cultivable Fallow Land,759,17.9
+Agricultural Land,Double Crop Land,750,17.68
+Agricultural Land,Triple Crop Land,516,12.17
+Agricultural Land,Single Crop Land,447,10.54
+Agricultural Land,Orchard,103,2.43
+Agricultural Land,Rice-cum-Fish Culture,19,0.45
+Commercial Area,Commercial Area,124,95.38
+Commercial Area,Gas Field/Power Station,4,3.08
+Commercial Area,Brick Field,2,1.54
+Educational Institutions,School/College/Madrasha,44,100.0
+Forest,Mangrove Plantation,139,100.0
+Miscellaneous Landuse,Mudflat,280,44.66
+Miscellaneous Landuse,Non-cultivable Fallow Land,232,37.0
+Miscellaneous Landuse,Grass Land,109,17.38
+Miscellaneous Landuse,Sandbar/Beach,6,0.96
+Monument,Shaheed Minar,1,100.0
+Recreational Places,Playground,34,100.0
+Religious Places,Mosque,19,90.48
+Religious Places,Eidgah,1,4.76
+Religious Places,Temple,1,4.76
+Road,Rural Road,196,86.34
+Road,Right of Way,25,11.01
+Road,Upazila Road,3,1.32
+Road,Embankment cum Road,2,0.88
+Road,Access Road,1,0.44
+Settlement,Rural Settlement with Homestead Vegetation,6597,99.65
+Settlement,Urban Built-up Area,21,0.32
+Settlement,Area Under Development,1,0.02
+Settlement,Open space,1,0.02
+Terminal,Helipad,1,100.0
+Water Bodies,Pond,9384,71.89
+Water Bodies,Ditch,2180,16.7
+Water Bodies,Aquaculture,933,7.15
+Water Bodies,Canal,539,4.13
+Water Bodies,River,18,0.14
