@@ -1,0 +1,31 @@
+maj_class,sub_class,count,percent_within_maj
+Administrative Area,Office Compound,17,100.0
+Agricultural Land,Triple Crop Land,1539,33.01
+Agricultural Land,Double Crop Land,938,20.12
+Agricultural Land,Agroforestry,906,19.43
+Agricultural Land,Single Crop Land,483,10.36
+Agricultural Land,Cultivable Fallow Land,338,7.25
+Agricultural Land,Betel Leaf Trellis,323,6.93
+Agricultural Land,Orchard,127,2.72
+Agricultural Land,Rice-cum-Fish Culture,8,0.17
+Commercial Area,Commercial Area,92,85.19
+Commercial Area,Brick Field,16,14.81
+Educational Institutions,School/College/Madrasha,78,100.0
+Forest,Mangrove Plantation,8,100.0
+Miscellaneous Landuse,Non-cultivable Fallow Land,17,94.44
+Miscellaneous Landuse,Mudflat,1,5.56
+Monument,Other Monuments,1,100.0
+Recreational Places,Playground,46,100.0
+Religious Places,Mosque,20,100.0
+Road,Rural Road,161,94.15
+Road,Upazila Road,8,4.68
+Road,Embankment cum Road,2,1.17
+Settlement,Rural Settlement with Homestead Vegetation,2251,99.6
+Settlement,Area Under Development,9,0.4
+Terminal,Boat Ghat,1,50.0
+Terminal,Helipad,1,50.0
+Water Bodies,Pond,5653,77.0
+Water Bodies,Ditch,930,12.67
+Water Bodies,Aquaculture,575,7.83
+Water Bodies,Canal,177,2.41
+Water Bodies,River,7,0.1
