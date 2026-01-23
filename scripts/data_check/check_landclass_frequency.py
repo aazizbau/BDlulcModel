@@ -16,6 +16,10 @@ import geopandas as gpd
 
 UPAZILA_GPKG = {
     "manpura": Path("assets/maps/manpura_landuse.gpkg"),
+    "betagi": Path("assets/maps/betagi_landuse.gpkg"),
+    "amtali": Path("assets/maps/amtali_landuse.gpkg"),
+    "bamna": Path("assets/maps/bamna_landuse.gpkg"),
+    "haimchar": Path("assets/maps/haimchar_landuse.gpkg"),
 }
 
 
