@@ -33,6 +33,8 @@ Each data subfolder contains `.gitkeep` placeholders so that the directory struc
    pip install --upgrade pip
    pip install -r requirements.txt
    ```
+   Note: `GDAL` (for `osgeo`) may require system packages. If `pip` fails, install
+   `gdal-bin` and `libgdal-dev` first (Ubuntu/Debian), then rerun the pip command.
 3. **Authenticate with Google Earth Engine** (one-time on each machine):
    ```bash
    earthengine authenticate
