@@ -1,12 +1,12 @@
 """
-Download Google AlphaEarth satellite embeddings for the Bangladesh coastal region (tiled).
+Download Google AlphaEarth satellite embeddings for the Four Upazila region (tiled).
 
 Usage:
-    python scripts/gee/download_alphaearth_embeddings.py \
-        --year 2024 \
+    python scripts/gee/download_alphaearth_fourupazila.py \
+        --year 2023 \
         --project ee-your-project-id \
-        --output data/raw/embeddings/bd_coastal_alphaearth_2024.tif \
-        --tile-width-km 2.5 --tile-height-km 2.5
+        --output data/raw/embeddings/fourupazila/bd_coastal_fourupazila_alphaearth_2023.tif \
+        --crs EPSG:32646
 """
 
 from __future__ import annotations
@@ -20,13 +20,13 @@ import ee
 import geemap
 
 
-AOI_NAME = "BD_COASTAL_DISREI"
-BD_COASTAL_BBOX = [
-    [88.4663, 23.5885],  # upper left
-    [88.6038, 20.2039],  # lower left
-    [92.8495, 20.2278],  # lower right
-    [92.6043, 23.7499],  # upper right
-    [88.4663, 23.5885],  # close polygon
+AOI_NAME = "FOUR_UPAZILA"
+FOURUPAZILA_BBOX = [
+    [89.9086, 22.5764],  # upper left
+    [89.8955, 21.7451],  # lower left
+    [91.1628, 21.7656],  # lower right
+    [91.1633, 22.6110],  # upper right
+    [89.9086, 22.5764],  # close polygon
 ]
 
 
@@ -48,9 +48,9 @@ def initialize_earth_engine(project: str | None = None) -> None:
         print("Google Earth Engine initialized.")
 
 
-def create_bd_coastal_geometry() -> ee.Geometry:
-    """Return a polygon geometry covering the Bangladesh coastal bounding box."""
-    return ee.Geometry.Polygon([BD_COASTAL_BBOX])
+def create_fourupazila_geometry() -> ee.Geometry:
+    """Return a polygon geometry covering the Four Upazila bounding box."""
+    return ee.Geometry.Polygon([FOURUPAZILA_BBOX])
 
 
 def build_embeddings_image(year: int, geometry: ee.Geometry) -> ee.Image:
@@ -175,29 +175,27 @@ def export_tiled_embeddings(
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=f"Download AlphaEarth embeddings for {AOI_NAME}."
-    )
+    parser = argparse.ArgumentParser(description=f"Download AlphaEarth embeddings for {AOI_NAME}.")
     parser.add_argument(
         "--year",
         type=int,
-        default=2024,
-        help="Acquisition year for the embeddings (default: 2024).",
+        default=2023,
+        help="Acquisition year for the embeddings (default: 2023).",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("data/raw/embeddings/bd_coastal_alphaearth_2024.tif"),
+        default=Path("data/raw/embeddings/fourupazila/bd_coastal_fourupazila_alphaearth_2023.tif"),
         help=(
             "Base output path. Each tile appends _rXX_cYY before the file suffix "
-            "(default: data/raw/embeddings/bd_coastal_alphaearth_2024.tif)."
+            "(default: data/raw/embeddings/fourupazila/bd_coastal_fourupazila_alphaearth_2023.tif)."
         ),
     )
     parser.add_argument(
         "--crs",
         type=str,
-        default="EPSG:4326",
-        help="CRS for the export (default: EPSG:4326).",
+        default="EPSG:32646",
+        help="CRS for the export (default: EPSG:32646).",
     )
     parser.add_argument(
         "--scale",
@@ -235,11 +233,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     initialize_earth_engine(project=args.project)
-    geometry = create_bd_coastal_geometry()
+    geometry = create_fourupazila_geometry()
     embeddings_image = build_embeddings_image(args.year, geometry)
     export_tiled_embeddings(
         embeddings_image,
-        BD_COASTAL_BBOX,
+        FOURUPAZILA_BBOX,
         geometry,
         output=args.output,
         crs=args.crs,
