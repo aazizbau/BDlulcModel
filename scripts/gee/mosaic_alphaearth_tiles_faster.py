@@ -12,6 +12,7 @@ Usage:
     python scripts/gee/mosaic_alphaearth_tiles_faster.py \
         --input-base data/raw/embeddings/bd_coastal_alphaearth_2024.tif \
         --output data/interim/bd_coastal_alphaearth_2024_mosaic.tif
+        --gdal-cache-mb 4096
 """
 
 from __future__ import annotations
