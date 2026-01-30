@@ -11,6 +11,7 @@ shapely>=2.0.0
 scikit-learn>=1.4.0
 xgboost>=2.0.0
 scipy>=1.11.0
+torch>=2.2.0
 
 # Utilities
 pyyaml>=6.0
