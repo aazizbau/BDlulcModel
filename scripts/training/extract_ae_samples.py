@@ -142,6 +142,7 @@ def extract_from_upazila(
     max_per_class_remaining: Dict[int, int],
     rng: np.random.Generator,
     chunk: int,
+    seed: int,
 ) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray], List[np.ndarray], Dict[str, int]]:
     """
     Returns lists of X_train parts, y_train parts, X_val parts, y_val parts.
@@ -233,7 +234,7 @@ def extract_from_upazila(
                     global_row = int(lbl_win.row_off + rr)
                     global_col = int(lbl_win.col_off + cc)
 
-                    u = block_assign(global_row, global_col, block_px, seed=int(rng.bit_generator._seed_seq.entropy))
+                    u = block_assign(global_row, global_col, block_px, seed=seed)
                     is_val = u < val_frac
 
                     feat = X[:, rr, cc]
@@ -316,6 +317,7 @@ def main() -> None:
                 max_per_class_remaining=max_per_class_remaining,
                 rng=rng,
                 chunk=args.chunk,
+                seed=args.seed,
             )
 
             if Xtr_parts:
