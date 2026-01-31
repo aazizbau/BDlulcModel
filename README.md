@@ -86,6 +86,15 @@ python scripts/clip_dissolved_coastal.py --skip-cog
 python scripts/clip_solid_coastal.py
 ```
 
+### Train AE64 MLP (v2)
+```bash
+python scripts/training/train_mlp_ae64_v2.py \
+    --data data/processed/training/ae64_samples_4upazila_2023.npz \
+    --run-name ae64_mlp_v2 \
+    --epochs 40 --batch-size 4096 --lr 7e-4 --weight-decay 1e-3 \
+    --amp
+```
+
 ## Next steps
 - Integrate coastal district shapefiles and reference labels into the `data/` tree.
 - Add preprocessing notebooks or scripts to harmonize training tiles with the embeddings.
