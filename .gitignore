@@ -40,8 +40,9 @@ data/external/
 !data/external/shapefiles/.gitkeep
 !data/external/ancillary/.gitkeep
 
-# Outputs & logs
+# Outputs, runs & logs
 logs/
+runs/
 !logs/.gitkeep
 experiments/
 !experiments/.gitkeep
