@@ -458,8 +458,7 @@ def train_one(
         factor=plateau_factor,
         patience=plateau_patience,
         threshold=1e-4,
-        min_lr=min_lr,
-        verbose=True,
+        min_lr=min_lr
     )
 
     scaler = torch.amp.GradScaler("cuda", enabled=(amp and dev.type == "cuda"))
