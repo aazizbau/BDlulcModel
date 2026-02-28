@@ -1,0 +1,15 @@
+name: BD_COASTAL_BBOX
+selection: bbox
+coordinates:
+  upper_left:
+    lat: 23.5885
+    lon: 88.4663
+  upper_right:
+    lat: 23.7499
+    lon: 92.6043
+  lower_right:
+    lat: 20.2278
+    lon: 92.8495
+  lower_left:
+    lat: 20.2039
+    lon: 88.6038
