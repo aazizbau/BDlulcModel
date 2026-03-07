@@ -15,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from shutil import which
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 DEFAULT_RASTER = Path("data/interim/bd_coastal_alphaearth_2024_mosaic.tif")
 DEFAULT_VECTOR = Path("assets/maps/bd_coastal_districts_disso_gp.gpkg")
 DEFAULT_OUTPUT = Path("processed/features/bd_coastal_alphaearth_2024.tif")
@@ -34,6 +36,10 @@ def ensure_tool(name: str) -> None:
 def run_command(cmd: list[str], env: dict | None = None) -> None:
     log("Running: " + " ".join(cmd))
     subprocess.run(cmd, check=True, env=env)
+
+
+def resolve_path(path: Path) -> Path:
+    return path if path.is_absolute() else PROJECT_ROOT / path
 
 
 def parse_overview_levels(levels: str | None) -> list[int]:
@@ -187,6 +193,10 @@ def main() -> None:
     ensure_tool("gdaladdo")
 
     args = parse_args()
+    args.input = resolve_path(args.input)
+    args.vector = resolve_path(args.vector)
+    args.output = resolve_path(args.output)
+    args.cog_path = resolve_path(args.cog_path)
 
     if not args.input.exists():
         raise SystemExit(f"Input raster not found: {args.input}")

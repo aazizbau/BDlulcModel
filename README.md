@@ -78,12 +78,12 @@ python scripts/sentinel/mosaic_sentinel_tiles_gdal.py \
 
 ### Clip AlphaEarth mosaic to dissolved coastal AOI
 ```bash
-python scripts/clip_dissolved_coastal.py --skip-cog
+python scripts/clipping/clip_dissolved_coastal.py --skip-cog
 ```
 
 ### Clip Sentinel mosaic to solid coastal AOI
 ```bash
-python scripts/clip_solid_coastal.py
+python scripts/clipping/clip_solid_coastal.py
 ```
 
 ### Train AE64 MLP (v2)

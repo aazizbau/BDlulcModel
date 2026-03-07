@@ -2,7 +2,7 @@
 Clip the coastal Sentinel mosaic to the solid coastal AOI using GDAL streaming tools.
 
 Example:
-    python scripts/clip_solid_coastal.py --year 2017 --band B11
+    python scripts/clipping/clip_solid_coastal.py --year 2017 --band B11
 """
 
 from __future__ import annotations
@@ -15,10 +15,12 @@ from pathlib import Path
 from shutil import which
 
 
-DEFAULT_BASE_DIR = Path("/media/abdul-aziz/345E19F75E19B29A/bd_coastal_tiles")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+DEFAULT_BASE_DIR = Path("data/raw/coastal_tiles")
 DEFAULT_RASTER = DEFAULT_BASE_DIR / "2017" / "coastal_2017_10_B02.tif"
-DEFAULT_VECTOR = Path("/media/abdul-aziz/sdb7/masters_research/bd_coastal_map/bd_coastal_map_solid_gp.gpkg")
-DEFAULT_OUTPUT_DIR = DEFAULT_BASE_DIR / "2017"
+DEFAULT_VECTOR = Path("assets/maps/bd_coastal_map_solid_gp.gpkg")
+DEFAULT_OUTPUT_DIR = Path("data/processed/clipping/2017")
 DEFAULT_OUTPUT_NAME = "coastal_2017_10_B02_solid.tif"
 
 
@@ -35,6 +37,10 @@ def ensure_tool(name: str) -> None:
 def run_command(cmd: list[str], env: dict | None = None) -> None:
     log("Running: " + " ".join(cmd))
     subprocess.run(cmd, check=True, env=env)
+
+
+def resolve_path(path: Path) -> Path:
+    return path if path.is_absolute() else PROJECT_ROOT / path
 
 
 def parse_args() -> argparse.Namespace:
@@ -179,6 +185,9 @@ def main() -> None:
     ensure_tool("gdalwarp")
 
     args = parse_args()
+    args.base_dir = resolve_path(args.base_dir)
+    args.vector = resolve_path(args.vector)
+
     if args.input is None:
         if args.year is not None and args.band is not None:
             args.input = (
@@ -187,14 +196,18 @@ def main() -> None:
                 / f"coastal_{args.year}_{args.resolution:02d}_{args.band}.tif"
             )
         else:
-            args.input = DEFAULT_RASTER
+            args.input = resolve_path(DEFAULT_RASTER)
+    else:
+        args.input = resolve_path(args.input)
 
     if args.output_dir is None:
         args.output_dir = (
             args.base_dir / str(args.year)
             if args.year is not None
-            else DEFAULT_OUTPUT_DIR
+            else resolve_path(DEFAULT_OUTPUT_DIR)
         )
+    else:
+        args.output_dir = resolve_path(args.output_dir)
 
     if args.output_name is None:
         if args.year is not None and args.band is not None:
