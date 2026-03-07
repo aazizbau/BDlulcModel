@@ -61,53 +61,48 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Make NDVI image from Sentinel-2 B4 (red) and B8 (NIR) rasters."
     )
-    parser.add_argument(
-        "--year",
-        type=int,
-        required=True,
-        help="Year of the input Sentinel-2 rasters, e.g. 2017.",
-    )
+    parser.add_argument("--year", type=int, required=True, help="Year, e.g. 2017.")
     parser.add_argument(
         "--input-dir",
         type=Path,
         default=DEFAULT_INPUT_DIR,
-        help=f'Input directory containing band rasters (default: "{DEFAULT_INPUT_DIR}").',
+        help=f'Input directory (default: "{DEFAULT_INPUT_DIR}").',
     )
     parser.add_argument(
         "--crs",
         type=str,
         default=DEFAULT_CRS,
-        help=f'Expected CRS of inputs/output (default: "{DEFAULT_CRS}").',
+        help=f'Expected CRS (default: "{DEFAULT_CRS}").',
     )
     parser.add_argument(
         "--red",
         type=Path,
         default=None,
-        help="Optional custom B4 raster path. If omitted, derived from --year and --input-dir.",
+        help="Optional custom B4 path.",
     )
     parser.add_argument(
         "--nir",
         type=Path,
         default=None,
-        help="Optional custom B8 raster path. If omitted, derived from --year and --input-dir.",
+        help="Optional custom B8 path.",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=None,
-        help="Optional output NDVI path. If omitted, derived from --year and --input-dir.",
+        help="Optional output NDVI path.",
     )
     parser.add_argument(
         "--input-nodata",
         type=int,
         default=DEFAULT_NODATA_IN,
-        help=f"Input nodata value fallback for B4/B8 rasters (default: {DEFAULT_NODATA_IN}).",
+        help=f"Fallback input nodata (default: {DEFAULT_NODATA_IN}).",
     )
     parser.add_argument(
         "--output-nodata",
         type=float,
         default=DEFAULT_NODATA_OUT,
-        help=f"Output nodata value for NDVI raster (default: {DEFAULT_NODATA_OUT}).",
+        help=f"Output nodata (default: {DEFAULT_NODATA_OUT}).",
     )
     return parser.parse_args()
 
@@ -218,7 +213,6 @@ def main() -> None:
         raise SystemExit(f"ERROR: NIR band file not found: {nir_path}")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-
     total_valid_pixels = 0
 
     with rasterio.open(red_path) as red_src, rasterio.open(nir_path) as nir_src:
@@ -278,9 +272,11 @@ def main() -> None:
                 total_valid_pixels += valid_count
                 dst.write(ndvi, 1, window=window)
 
+        with rasterio.open(out_path, "r+") as dst:
             ndvi_band = dst.read(1, masked=True)
             total_pixels = dst.width * dst.height
-            nodata_pixels = total_pixels - ndvi_band.count()
+            valid_pixels = int(ndvi_band.count())
+            nodata_pixels = int(total_pixels - valid_pixels)
 
             dst.update_tags(
                 AREA_OR_POINT="Area",
@@ -309,9 +305,9 @@ def main() -> None:
                 PIXEL_SIZE_Y=str(dst.transform.e),
                 ORIGIN_X=str(dst.transform.c),
                 ORIGIN_Y=str(dst.transform.f),
-                VALID_PIXEL_COUNT=str(ndvi_band.count()),
+                VALID_PIXEL_COUNT=str(valid_pixels),
                 NODATA_PIXEL_COUNT=str(nodata_pixels),
-                VALID_FRACTION=f"{ndvi_band.count() / total_pixels:.10f}" if total_pixels > 0 else "None",
+                VALID_FRACTION=f"{valid_pixels / total_pixels:.10f}" if total_pixels > 0 else "None",
                 NDVI_MIN=safe_stat(ndvi_band, "min"),
                 NDVI_MAX=safe_stat(ndvi_band, "max"),
                 NDVI_MEAN=safe_stat(ndvi_band, "mean"),
