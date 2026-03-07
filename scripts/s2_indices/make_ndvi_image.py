@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -120,12 +120,12 @@ def resolve_paths(args: argparse.Namespace) -> tuple[Path, Path, Path]:
 
 def same_transform(a, b, tol: float = 1e-9) -> bool:
     return (
-        abs(a.a - b.a) < tol and
-        abs(a.b - b.b) < tol and
-        abs(a.c - b.c) < tol and
-        abs(a.d - b.d) < tol and
-        abs(a.e - b.e) < tol and
-        abs(a.f - b.f) < tol
+        abs(a.a - b.a) < tol
+        and abs(a.b - b.b) < tol
+        and abs(a.c - b.c) < tol
+        and abs(a.d - b.d) < tol
+        and abs(a.e - b.e) < tol
+        and abs(a.f - b.f) < tol
     )
 
 
@@ -158,16 +158,67 @@ def compute_ndvi(
     return ndvi, int(valid.sum())
 
 
-def safe_stat(masked_arr, func_name: str) -> str:
-    if masked_arr.count() == 0:
-        return "None"
-    value = getattr(masked_arr, func_name)()
-    return f"{float(value):.10f}"
+def compute_raster_stats_blockwise(
+    raster_path: Path,
+    nodata_value: float | int | None,
+) -> dict[str, str]:
+    """
+    Compute min/max/mean/std block by block without loading the full raster.
+    Returns string values for GeoTIFF tags.
+    """
+    count_valid = 0
+    sum_valid = 0.0
+    sumsq_valid = 0.0
+    min_val = None
+    max_val = None
+
+    with rasterio.open(raster_path) as src:
+        for _, window in src.block_windows(1):
+            arr = src.read(1, window=window)
+
+            valid = np.isfinite(arr)
+            if nodata_value is not None:
+                valid &= arr != nodata_value
+
+            if not np.any(valid):
+                continue
+
+            vals = arr[valid].astype(np.float64, copy=False)
+
+            block_min = float(vals.min())
+            block_max = float(vals.max())
+
+            if min_val is None or block_min < min_val:
+                min_val = block_min
+            if max_val is None or block_max > max_val:
+                max_val = block_max
+
+            count_valid += vals.size
+            sum_valid += float(vals.sum())
+            sumsq_valid += float(np.square(vals, dtype=np.float64).sum())
+
+    if count_valid == 0:
+        return {
+            "min": "None",
+            "max": "None",
+            "mean": "None",
+            "std": "None",
+        }
+
+    mean_val = sum_valid / count_valid
+    variance = max(0.0, (sumsq_valid / count_valid) - (mean_val * mean_val))
+    std_val = variance ** 0.5
+
+    return {
+        "min": f"{min_val:.10f}",
+        "max": f"{max_val:.10f}",
+        "mean": f"{mean_val:.10f}",
+        "std": f"{std_val:.10f}",
+    }
 
 
 def print_output_summary(out_path: Path) -> None:
     with rasterio.open(out_path) as src:
-        band = src.read(1, masked=True)
         tags = src.tags()
         transform = src.transform
 
@@ -178,9 +229,12 @@ def print_output_summary(out_path: Path) -> None:
         log(f"  Pixel size : ({transform.a}, {transform.e})")
         log(f"  Nodata     : {src.nodata}")
         log(f"  Dtype      : {src.dtypes[0]}")
-        if band.count() > 0:
-            log(f"  Min/Max    : {float(band.min()):.6f} / {float(band.max()):.6f}")
-            log(f"  Mean/Std   : {float(band.mean()):.6f} / {float(band.std()):.6f}")
+
+        if "NDVI_MIN" in tags and "NDVI_MAX" in tags:
+            log(f"  Min/Max    : {tags['NDVI_MIN']} / {tags['NDVI_MAX']}")
+        if "NDVI_MEAN" in tags and "NDVI_STD" in tags:
+            log(f"  Mean/Std   : {tags['NDVI_MEAN']} / {tags['NDVI_STD']}")
+
         log("  Embedded metadata tags:")
         for k in sorted(tags):
             log(f"    {k}={tags[k]}")
@@ -272,10 +326,15 @@ def main() -> None:
                 total_valid_pixels += valid_count
                 dst.write(ndvi, 1, window=window)
 
+        log("Computing NDVI statistics block by block...")
+        ndvi_stats = compute_raster_stats_blockwise(
+            out_path,
+            nodata_value=args.output_nodata,
+        )
+
         with rasterio.open(out_path, "r+") as dst:
-            ndvi_band = dst.read(1, masked=True)
             total_pixels = dst.width * dst.height
-            valid_pixels = int(ndvi_band.count())
+            valid_pixels = total_valid_pixels
             nodata_pixels = int(total_pixels - valid_pixels)
 
             dst.update_tags(
@@ -308,10 +367,10 @@ def main() -> None:
                 VALID_PIXEL_COUNT=str(valid_pixels),
                 NODATA_PIXEL_COUNT=str(nodata_pixels),
                 VALID_FRACTION=f"{valid_pixels / total_pixels:.10f}" if total_pixels > 0 else "None",
-                NDVI_MIN=safe_stat(ndvi_band, "min"),
-                NDVI_MAX=safe_stat(ndvi_band, "max"),
-                NDVI_MEAN=safe_stat(ndvi_band, "mean"),
-                NDVI_STD=safe_stat(ndvi_band, "std"),
+                NDVI_MIN=ndvi_stats["min"],
+                NDVI_MAX=ndvi_stats["max"],
+                NDVI_MEAN=ndvi_stats["mean"],
+                NDVI_STD=ndvi_stats["std"],
             )
 
         log(f"NDVI raster written successfully (valid pixels written: {total_valid_pixels})")
