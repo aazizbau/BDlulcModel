@@ -9,12 +9,13 @@ Output NPZ contains:
   X_train, y_train, X_val, y_val, mu, sigma, feature_names, meta
 
 Example:
-  python scripts/training/extract_ae64_plus10indices_samples.py \
-    --ae data/interim/bd_coastal_fourupazila_alphaearth_2023_mosaic_f32.tif \
-    --output data/processed/training/ae64_plus10indices_samples_4upazila_2023.npz \
-    --max-per-class 300000 \
-    --val-frac 0.2 \
-    --block-size-m 1000
+python scripts/training/extract_ae64_plus10indices_samples.py \
+  --ae data/interim/bd_coastal_fourupazila_alphaearth_2023_mosaic_f32.tif \
+  --interim-dir data/interim/ae_aligned_indices_2023 \
+  --output data/processed/training/ae64_plus10indices_samples_4upazila_2023.npz \
+  --max-per-class 300000 \
+  --val-frac 0.2 \
+  --block-size-m 1000
 
 Notes:
 - Uses simple early fusion at extraction time:
@@ -89,7 +90,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--interim-dir",
         type=Path,
-        default=Path("data/interim"),
+        default=Path("data/interim/ae_aligned_indices_2023"),
         help="Base directory containing the 10 spectral index rasters.",
     )
     p.add_argument(
@@ -174,9 +175,9 @@ def block_assign(row: int, col: int, block_px: int, seed: int) -> float:
 
 def build_index_paths(interim_dir: Path, year: int) -> Dict[str, Path]:
     # Example exact path this function creates for NDVI:
-    # paths["ndvi"] = Path("data/interim/bdcoastal_solid_2023_utm46_ndvi.tif")
+    # paths["ndvi"] = Path("data/interim/ae_aligned_indices_2023/bdcoastal_4upazila_2023_utm46_ndvi_aegrid.tif")
     paths = {
-        name: interim_dir / f"bdcoastal_solid_{year}_utm46_{name}.tif"
+        name: interim_dir / f"bdcoastal_4upazila_{year}_utm46_{name}_aegrid.tif"
         for name in INDEX_ORDER
     }
     return paths
