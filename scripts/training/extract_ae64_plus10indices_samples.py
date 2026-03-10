@@ -173,6 +173,8 @@ def block_assign(row: int, col: int, block_px: int, seed: int) -> float:
 
 
 def build_index_paths(interim_dir: Path, year: int) -> Dict[str, Path]:
+    # Example exact path this function creates for NDVI:
+    # paths["ndvi"] = Path("data/interim/bdcoastal_solid_2023_utm46_ndvi.tif")
     paths = {
         name: interim_dir / f"bdcoastal_solid_{year}_utm46_{name}.tif"
         for name in INDEX_ORDER
