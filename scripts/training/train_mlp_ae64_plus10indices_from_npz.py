@@ -2,12 +2,17 @@
 """
 Train an MLP classifier on AE64 + 10 indices samples stored in NPZ.
 
-Input NPZ must contain:
-  X_train, y_train, X_val, y_val, mu, sigma, feature_names, meta
+Expected NPZ keys:
+  Required:
+    X_train, y_train, X_val, y_val, mu, sigma, feature_names, meta
+
+  Optional:
+    X_test, y_test
 
 This script:
 - loads NPZ
 - normalizes X using mu/sigma from the NPZ
+- enforces labels to be in 1..10
 - converts labels from 1..10 to 0..9 internally
 - computes class weights from y_train
 - trains an MLP classifier with weighted cross-entropy
@@ -20,22 +25,35 @@ This script:
     * per-epoch history.csv
     * confusion_matrix_val.csv
     * val_predictions.csv
+    * per_class_metrics_val.csv
+    * if test exists:
+        - confusion_matrix_test.csv
+        - test_predictions.csv
+        - per_class_metrics_test.csv
+- auto-updates:
+    runs/mlp_ae64plus10idx_master_runs.csv
 
 Example:
 python scripts/training/train_mlp_ae64_plus10indices_from_npz.py \
   --data data/processed/training/ae64_plus10indices_samples_4upazila_2023.npz \
-  --outdir runs/mlp_ae64plus10idx_h512-256_do02_lr1e3_bs8192_v1 \
+  --outdir runs/mlp_ae64plus10idx_h512-256_do02_lr1e3_bs4096_v1 \
   --hidden 512 256 \
   --dropout 0.2 \
-  --batch-size 8192 \
+  --batch-size 4096 \
   --epochs 100 \
   --lr 1e-3 \
   --weight-decay 1e-4 \
   --patience 15 \
-  --device cuda
-
+  --min-delta 1e-4 \
+  --label-smoothing 0.05 \
+  --scheduler \
+  --scheduler-factor 0.5 \
+  --scheduler-patience 5 \
+  --eval-every 1 \
+  --device cuda \
+  --seed 42
 Notes:
-- Labels in NPZ are expected to be 1..10.
+- Labels are expected to be class IDs 1..10.
 - Internally the model uses 0..9 for PyTorch cross-entropy.
 """
 
@@ -50,7 +68,7 @@ import time
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -60,6 +78,8 @@ from torch.utils.data import DataLoader, TensorDataset
 
 JST = timezone(timedelta(hours=9))
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+MASTER_CSV_DEFAULT = PROJECT_ROOT / "runs" / "mlp_ae64plus10idx_master_runs.csv"
+NUM_CLASSES_FIXED = 10
 
 
 def log(message: str) -> None:
@@ -183,6 +203,17 @@ def parse_args() -> argparse.Namespace:
         default=42,
         help="Random seed (default: 42).",
     )
+    p.add_argument(
+        "--master-csv",
+        type=Path,
+        default=MASTER_CSV_DEFAULT,
+        help="Master runs CSV path (default: runs/mlp_ae64plus10idx_master_runs.csv).",
+    )
+    p.add_argument(
+        "--no-master-update",
+        action="store_true",
+        help="Disable auto-update of master runs CSV.",
+    )
     return p.parse_args()
 
 
@@ -271,7 +302,8 @@ def compute_class_weights(y_train_zero_based: np.ndarray, num_classes: int) -> n
         else:
             weights[i] = 0.0
 
-    mean_nonzero = weights[weights > 0].mean()
+    nonzero = weights[weights > 0]
+    mean_nonzero = float(nonzero.mean()) if nonzero.size > 0 else 0.0
     if mean_nonzero > 0:
         weights = weights / mean_nonzero
 
@@ -279,7 +311,38 @@ def compute_class_weights(y_train_zero_based: np.ndarray, num_classes: int) -> n
 
 
 def normalize_features(X: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> np.ndarray:
-    return ((X - mu) / sigma).astype(np.float32)
+    sigma_safe = np.where(sigma == 0, 1.0, sigma).astype(np.float32)
+    Xn = (X - mu) / sigma_safe
+    return Xn.astype(np.float32)
+
+
+def ensure_finite_array(name: str, arr: np.ndarray) -> None:
+    if not np.isfinite(arr).all():
+        raise SystemExit(f"Non-finite values found in {name}.")
+
+
+def validate_feature_stats(mu: np.ndarray, sigma: np.ndarray, input_dim: int) -> None:
+    if mu.ndim != 1 or sigma.ndim != 1:
+        raise SystemExit("mu and sigma must both be 1D arrays.")
+    if len(mu) != input_dim or len(sigma) != input_dim:
+        raise SystemExit(
+            f"mu/sigma length mismatch with input_dim: len(mu)={len(mu)} len(sigma)={len(sigma)} input_dim={input_dim}"
+        )
+
+
+def validate_labels(name: str, y: np.ndarray) -> None:
+    if y.ndim != 1:
+        raise SystemExit(f"{name} must be 1D.")
+    unique = sorted(np.unique(y).tolist())
+    allowed = set(range(1, NUM_CLASSES_FIXED + 1))
+    if not set(unique).issubset(allowed):
+        raise SystemExit(f"{name} contains invalid labels. Found {unique}, expected subset of 1..{NUM_CLASSES_FIXED}.")
+
+
+def describe_label_presence(y: np.ndarray) -> Dict[str, List[int]]:
+    present = sorted(np.unique(y).tolist())
+    missing = [i for i in range(1, NUM_CLASSES_FIXED + 1) if i not in present]
+    return {"present": present, "missing": missing}
 
 
 def evaluate(
@@ -323,6 +386,28 @@ def evaluate(
     return loss_avg, acc, macro_f1, bal_acc, y_true, y_pred
 
 
+def per_class_metrics_from_cm(cm: np.ndarray) -> List[Dict[str, float]]:
+    rows: List[Dict[str, float]] = []
+    for c in range(cm.shape[0]):
+        tp = float(cm[c, c])
+        fp = float(cm[:, c].sum() - tp)
+        fn = float(cm[c, :].sum() - tp)
+        support = int(cm[c, :].sum())
+
+        precision = safe_div(tp, tp + fp)
+        recall = safe_div(tp, tp + fn)
+        f1 = safe_div(2 * precision * recall, precision + recall) if (precision + recall) > 0 else 0.0
+
+        rows.append({
+            "class_id": c + 1,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "support": support,
+        })
+    return rows
+
+
 def save_history_csv(path: Path, history: List[EpochMetrics]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
@@ -356,7 +441,7 @@ def save_confusion_matrix_csv(path: Path, cm: np.ndarray) -> None:
             writer.writerow([str(i + 1)] + cm[i].tolist())
 
 
-def save_val_predictions_csv(path: Path, y_true_zero: np.ndarray, y_pred_zero: np.ndarray) -> None:
+def save_predictions_csv(path: Path, y_true_zero: np.ndarray, y_pred_zero: np.ndarray) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
         writer = csv.writer(f)
@@ -365,10 +450,111 @@ def save_val_predictions_csv(path: Path, y_true_zero: np.ndarray, y_pred_zero: n
             writer.writerow([int(t) + 1, int(p) + 1])
 
 
+def save_per_class_metrics_csv(path: Path, rows: List[Dict[str, float]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["class_id", "precision", "recall", "f1", "support"],
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+
+def write_json(path: Path, obj: Dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        json.dump(obj, f, indent=2)
+
+
+def load_best_checkpoint_for_eval(
+    ckpt_path: Path,
+    device: torch.device,
+) -> Tuple[nn.Module, Dict]:
+    ckpt = torch.load(ckpt_path, map_location=device)
+    model = MLPClassifier(
+        input_dim=int(ckpt["input_dim"]),
+        hidden_dims=list(ckpt["hidden_dims"]),
+        num_classes=int(ckpt["num_classes"]),
+        dropout=float(ckpt["dropout"]),
+    ).to(device)
+    model.load_state_dict(ckpt["model_state_dict"])
+    model.eval()
+    return model, ckpt
+
+
+def update_master_runs_csv(master_csv_path: Path, row: Dict[str, object]) -> None:
+    master_csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fieldnames = [
+        "run_dir",
+        "timestamp_jst",
+        "data_npz",
+        "model",
+        "seed",
+        "input_dim",
+        "num_classes",
+        "hidden_dims",
+        "dropout",
+        "batch_size",
+        "epochs_requested",
+        "epochs_completed",
+        "lr",
+        "weight_decay",
+        "label_smoothing",
+        "scheduler",
+        "scheduler_factor",
+        "scheduler_patience",
+        "patience",
+        "min_delta",
+        "train_samples",
+        "val_samples",
+        "test_samples",
+        "best_epoch",
+        "best_val_loss",
+        "best_val_acc",
+        "best_val_macro_f1",
+        "best_val_balanced_acc",
+        "test_loss",
+        "test_acc",
+        "test_macro_f1",
+        "test_balanced_acc",
+        "total_train_seconds",
+        "class_weights",
+        "notes",
+    ]
+
+    existing_rows: List[Dict[str, str]] = []
+    if master_csv_path.exists():
+        with master_csv_path.open("r", newline="") as f:
+            reader = csv.DictReader(f)
+            for r in reader:
+                existing_rows.append(dict(r))
+
+    run_dir_str = str(row["run_dir"])
+    replaced = False
+    for i, r in enumerate(existing_rows):
+        if r.get("run_dir") == run_dir_str:
+            existing_rows[i] = {k: str(row.get(k, "")) for k in fieldnames}
+            replaced = True
+            break
+
+    if not replaced:
+        existing_rows.append({k: str(row.get(k, "")) for k in fieldnames})
+
+    with master_csv_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for r in existing_rows:
+            writer.writerow(r)
+
+
 def main() -> None:
     args = parse_args()
     args.data = resolve_path(args.data)
     args.outdir = resolve_path(args.outdir)
+    args.master_csv = resolve_path(args.master_csv)
     args.outdir.mkdir(parents=True, exist_ok=True)
 
     if not args.data.exists():
@@ -379,6 +565,11 @@ def main() -> None:
 
     log(f"Loading NPZ: {args.data}")
     with np.load(args.data, allow_pickle=True) as d:
+        required_keys = ["X_train", "y_train", "X_val", "y_val", "mu", "sigma", "feature_names", "meta"]
+        missing_required = [k for k in required_keys if k not in d]
+        if missing_required:
+            raise SystemExit(f"Missing required NPZ keys: {missing_required}")
+
         X_train = d["X_train"].astype(np.float32)
         y_train = d["y_train"].astype(np.int64)
         X_val = d["X_val"].astype(np.float32)
@@ -388,33 +579,67 @@ def main() -> None:
         feature_names = d["feature_names"]
         meta = json.loads(str(d["meta"]))
 
+        has_test = ("X_test" in d) and ("y_test" in d)
+        X_test = d["X_test"].astype(np.float32) if has_test else None
+        y_test = d["y_test"].astype(np.int64) if has_test else None
+
     if X_train.ndim != 2 or X_val.ndim != 2:
         raise SystemExit("X_train and X_val must be 2D.")
     if y_train.ndim != 1 or y_val.ndim != 1:
         raise SystemExit("y_train and y_val must be 1D.")
-    if X_train.shape[1] != 74:
-        log(f"Warning: expected 74 features, found {X_train.shape[1]}")
+    if X_train.shape[1] != X_val.shape[1]:
+        raise SystemExit("X_train and X_val must have same number of columns.")
+    if has_test:
+        if X_test is None or y_test is None:
+            raise SystemExit("Internal error: has_test inconsistent.")
+        if X_test.ndim != 2 or y_test.ndim != 1:
+            raise SystemExit("X_test must be 2D and y_test must be 1D.")
+        if X_test.shape[1] != X_train.shape[1]:
+            raise SystemExit("X_test must have same number of columns as X_train.")
 
-    num_classes = int(np.max(y_train))
-    if set(np.unique(y_train).tolist()) - set(range(1, num_classes + 1)):
-        raise SystemExit("Training labels must be contiguous class IDs starting from 1.")
+    input_dim = int(X_train.shape[1])
+    validate_feature_stats(mu, sigma, input_dim)
 
-    # Convert labels from 1..10 to 0..9 for PyTorch CE.
+    if input_dim != 74:
+        log(f"Warning: expected 74 features for AE64 + 10 indices, found {input_dim}")
+
+    validate_labels("y_train", y_train)
+    validate_labels("y_val", y_val)
+    if has_test and y_test is not None:
+        validate_labels("y_test", y_test)
+
+    train_presence = describe_label_presence(y_train)
+    val_presence = describe_label_presence(y_val)
+    test_presence = describe_label_presence(y_test) if has_test and y_test is not None else None
+
+    log(f"Train label presence: present={train_presence['present']} missing={train_presence['missing']}")
+    log(f"Val label presence  : present={val_presence['present']} missing={val_presence['missing']}")
+    if test_presence is not None:
+        log(f"Test label presence : present={test_presence['present']} missing={test_presence['missing']}")
+
+    num_classes = NUM_CLASSES_FIXED
+
     y_train_zero = y_train - 1
     y_val_zero = y_val - 1
+    y_test_zero = (y_test - 1) if has_test and y_test is not None else None
 
-    # Normalize using train mu/sigma already stored in NPZ.
-    log("Normalizing train/val using NPZ mu/sigma.")
+    log("Normalizing train/val/test using NPZ mu/sigma.")
     X_train = normalize_features(X_train, mu, sigma)
     X_val = normalize_features(X_val, mu, sigma)
+    if has_test and X_test is not None:
+        X_test = normalize_features(X_test, mu, sigma)
 
-    input_dim = X_train.shape[1]
+    ensure_finite_array("X_train", X_train)
+    ensure_finite_array("X_val", X_val)
+    if has_test and X_test is not None:
+        ensure_finite_array("X_test", X_test)
 
     class_weights_np = compute_class_weights(y_train_zero, num_classes=num_classes)
     class_weights_t = torch.tensor(class_weights_np, dtype=torch.float32, device=device)
 
     log(f"Train samples     : {X_train.shape[0]}")
     log(f"Val samples       : {X_val.shape[0]}")
+    log(f"Test samples      : {X_test.shape[0] if has_test and X_test is not None else 0}")
     log(f"Input dim         : {input_dim}")
     log(f"Num classes       : {num_classes}")
     log(f"Hidden dims       : {args.hidden}")
@@ -436,6 +661,14 @@ def main() -> None:
         torch.from_numpy(X_val),
         torch.from_numpy(y_val_zero.astype(np.int64)),
     )
+    test_ds = (
+        TensorDataset(
+            torch.from_numpy(X_test),
+            torch.from_numpy(y_test_zero.astype(np.int64)),
+        )
+        if has_test and X_test is not None and y_test_zero is not None
+        else None
+    )
 
     pin_memory = device.type == "cuda"
     train_loader = DataLoader(
@@ -453,6 +686,18 @@ def main() -> None:
         num_workers=0,
         pin_memory=pin_memory,
         drop_last=False,
+    )
+    test_loader = (
+        DataLoader(
+            test_ds,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=pin_memory,
+            drop_last=False,
+        )
+        if test_ds is not None
+        else None
     )
 
     model = MLPClassifier(
@@ -484,14 +729,22 @@ def main() -> None:
     best_val_macro_f1 = -1.0
     best_epoch = -1
     best_val_loss = math.inf
+    best_val_acc = math.nan
+    best_val_bal_acc = math.nan
     epochs_without_improve = 0
     history: List[EpochMetrics] = []
 
     best_ckpt_path = args.outdir / "best_model.pt"
     history_csv_path = args.outdir / "history.csv"
     summary_json_path = args.outdir / "summary.json"
-    cm_csv_path = args.outdir / "confusion_matrix_val.csv"
+
+    cm_val_csv_path = args.outdir / "confusion_matrix_val.csv"
     val_preds_csv_path = args.outdir / "val_predictions.csv"
+    per_class_val_csv_path = args.outdir / "per_class_metrics_val.csv"
+
+    cm_test_csv_path = args.outdir / "confusion_matrix_test.csv"
+    test_preds_csv_path = args.outdir / "test_predictions.csv"
+    per_class_test_csv_path = args.outdir / "per_class_metrics_test.csv"
 
     overall_start = time.time()
 
@@ -523,8 +776,8 @@ def main() -> None:
             train_pred_parts.append(pred.detach().cpu().numpy())
 
         train_loss = running_loss / running_n if running_n > 0 else math.nan
-        y_train_true_ep = np.concatenate(train_true_parts)
-        y_train_pred_ep = np.concatenate(train_pred_parts)
+        y_train_true_ep = np.concatenate(train_true_parts) if train_true_parts else np.zeros((0,), dtype=np.int64)
+        y_train_pred_ep = np.concatenate(train_pred_parts) if train_pred_parts else np.zeros((0,), dtype=np.int64)
         train_cm = confusion_matrix_np(y_train_true_ep, y_train_pred_ep, num_classes)
         train_acc = accuracy_np(y_train_true_ep, y_train_pred_ep)
         train_macro_f1 = macro_f1_from_cm(train_cm)
@@ -583,11 +836,18 @@ def main() -> None:
         if scheduler is not None and should_eval and np.isfinite(val_loss):
             scheduler.step(val_loss)
 
-        improved = should_eval and np.isfinite(val_macro_f1) and (val_macro_f1 > best_val_macro_f1 + args.min_delta)
+        improved = False
+        if should_eval and np.isfinite(val_macro_f1):
+            if val_macro_f1 > best_val_macro_f1 + args.min_delta:
+                improved = True
+            elif abs(val_macro_f1 - best_val_macro_f1) <= args.min_delta and val_loss < best_val_loss:
+                improved = True
 
         if improved:
-            best_val_macro_f1 = val_macro_f1
-            best_val_loss = val_loss
+            best_val_macro_f1 = float(val_macro_f1)
+            best_val_loss = float(val_loss)
+            best_val_acc = float(val_acc)
+            best_val_bal_acc = float(val_bal_acc)
             best_epoch = epoch
             epochs_without_improve = 0
 
@@ -605,6 +865,8 @@ def main() -> None:
                     "epoch": epoch,
                     "best_val_macro_f1": best_val_macro_f1,
                     "best_val_loss": best_val_loss,
+                    "best_val_acc": best_val_acc,
+                    "best_val_balanced_acc": best_val_bal_acc,
                     "args": vars(args),
                     "data_meta": meta,
                 },
@@ -612,13 +874,23 @@ def main() -> None:
             )
 
             best_val_cm = confusion_matrix_np(y_val_true_ep, y_val_pred_ep, num_classes)
-            save_confusion_matrix_csv(cm_csv_path, best_val_cm)
-            save_val_predictions_csv(val_preds_csv_path, y_val_true_ep, y_val_pred_ep)
+            save_confusion_matrix_csv(cm_val_csv_path, best_val_cm)
+            save_predictions_csv(val_preds_csv_path, y_val_true_ep, y_val_pred_ep)
+            save_per_class_metrics_csv(
+                per_class_val_csv_path,
+                per_class_metrics_from_cm(best_val_cm),
+            )
 
-            log(f"New best model saved at epoch {epoch} with val_macro_f1={best_val_macro_f1:.4f}")
+            log(
+                f"New best model saved at epoch {epoch} "
+                f"with val_macro_f1={best_val_macro_f1:.4f}, val_loss={best_val_loss:.5f}"
+            )
         elif should_eval:
             epochs_without_improve += 1
-            log(f"No improvement for {epochs_without_improve} eval(s). Best epoch={best_epoch}, best_val_macro_f1={best_val_macro_f1:.4f}")
+            log(
+                f"No improvement for {epochs_without_improve} eval(s). "
+                f"Best epoch={best_epoch}, best_val_macro_f1={best_val_macro_f1:.4f}, best_val_loss={best_val_loss:.5f}"
+            )
 
         save_history_csv(history_csv_path, history)
 
@@ -627,6 +899,40 @@ def main() -> None:
             break
 
     total_seconds = time.time() - overall_start
+
+    test_loss = math.nan
+    test_acc = math.nan
+    test_macro_f1 = math.nan
+    test_bal_acc = math.nan
+    test_done = False
+
+    if best_ckpt_path.exists() and test_loader is not None:
+        log("Loading best checkpoint for final test evaluation.")
+        best_model, _ = load_best_checkpoint_for_eval(best_ckpt_path, device=device)
+
+        test_loss, test_acc, test_macro_f1, test_bal_acc, y_test_true_best, y_test_pred_best = evaluate(
+            model=best_model,
+            loader=test_loader,
+            criterion=criterion,
+            device=device,
+            num_classes=num_classes,
+        )
+
+        test_cm = confusion_matrix_np(y_test_true_best, y_test_pred_best, num_classes)
+        save_confusion_matrix_csv(cm_test_csv_path, test_cm)
+        save_predictions_csv(test_preds_csv_path, y_test_true_best, y_test_pred_best)
+        save_per_class_metrics_csv(
+            per_class_test_csv_path,
+            per_class_metrics_from_cm(test_cm),
+        )
+
+        log(
+            f"Test metrics | "
+            f"loss={test_loss:.5f} acc={test_acc:.4f} macro_f1={test_macro_f1:.4f} bal_acc={test_bal_acc:.4f}"
+        )
+        test_done = True
+    elif test_loader is None:
+        log("No test split found in NPZ. Skipping test evaluation.")
 
     summary = {
         "created_at_jst": datetime.now(JST).isoformat(timespec="seconds"),
@@ -645,31 +951,97 @@ def main() -> None:
         "weight_decay": args.weight_decay,
         "label_smoothing": args.label_smoothing,
         "scheduler": args.scheduler,
+        "scheduler_factor": args.scheduler_factor,
+        "scheduler_patience": args.scheduler_patience,
         "class_weights": class_weights_np.tolist(),
         "train_samples": int(X_train.shape[0]),
         "val_samples": int(X_val.shape[0]),
+        "test_samples": int(X_test.shape[0]) if has_test and X_test is not None else 0,
         "best_epoch": best_epoch,
         "best_val_macro_f1": float(best_val_macro_f1),
         "best_val_loss": float(best_val_loss),
+        "best_val_acc": float(best_val_acc) if np.isfinite(best_val_acc) else None,
+        "best_val_balanced_acc": float(best_val_bal_acc) if np.isfinite(best_val_bal_acc) else None,
+        "test_evaluated": test_done,
+        "test_loss": float(test_loss) if np.isfinite(test_loss) else None,
+        "test_acc": float(test_acc) if np.isfinite(test_acc) else None,
+        "test_macro_f1": float(test_macro_f1) if np.isfinite(test_macro_f1) else None,
+        "test_balanced_acc": float(test_bal_acc) if np.isfinite(test_bal_acc) else None,
         "total_train_seconds": float(total_seconds),
         "history_csv": str(history_csv_path),
         "best_model_path": str(best_ckpt_path),
-        "confusion_matrix_val_csv": str(cm_csv_path),
+        "confusion_matrix_val_csv": str(cm_val_csv_path),
         "val_predictions_csv": str(val_preds_csv_path),
+        "per_class_metrics_val_csv": str(per_class_val_csv_path),
+        "confusion_matrix_test_csv": str(cm_test_csv_path) if test_done else None,
+        "test_predictions_csv": str(test_preds_csv_path) if test_done else None,
+        "per_class_metrics_test_csv": str(per_class_test_csv_path) if test_done else None,
+        "train_label_presence": train_presence,
+        "val_label_presence": val_presence,
+        "test_label_presence": test_presence,
+        "data_meta": meta,
     }
 
-    with summary_json_path.open("w") as f:
-        json.dump(summary, f, indent=2)
+    write_json(summary_json_path, summary)
+
+    if not args.no_master_update:
+        master_row = {
+            "run_dir": str(args.outdir),
+            "timestamp_jst": summary["created_at_jst"],
+            "data_npz": str(args.data),
+            "model": "MLPClassifier",
+            "seed": args.seed,
+            "input_dim": input_dim,
+            "num_classes": num_classes,
+            "hidden_dims": "-".join(str(x) for x in args.hidden),
+            "dropout": args.dropout,
+            "batch_size": args.batch_size,
+            "epochs_requested": args.epochs,
+            "epochs_completed": len(history),
+            "lr": args.lr,
+            "weight_decay": args.weight_decay,
+            "label_smoothing": args.label_smoothing,
+            "scheduler": args.scheduler,
+            "scheduler_factor": args.scheduler_factor,
+            "scheduler_patience": args.scheduler_patience,
+            "patience": args.patience,
+            "min_delta": args.min_delta,
+            "train_samples": int(X_train.shape[0]),
+            "val_samples": int(X_val.shape[0]),
+            "test_samples": int(X_test.shape[0]) if has_test and X_test is not None else 0,
+            "best_epoch": best_epoch,
+            "best_val_loss": best_val_loss if np.isfinite(best_val_loss) else "",
+            "best_val_acc": best_val_acc if np.isfinite(best_val_acc) else "",
+            "best_val_macro_f1": best_val_macro_f1 if np.isfinite(best_val_macro_f1) else "",
+            "best_val_balanced_acc": best_val_bal_acc if np.isfinite(best_val_bal_acc) else "",
+            "test_loss": test_loss if np.isfinite(test_loss) else "",
+            "test_acc": test_acc if np.isfinite(test_acc) else "",
+            "test_macro_f1": test_macro_f1 if np.isfinite(test_macro_f1) else "",
+            "test_balanced_acc": test_bal_acc if np.isfinite(test_bal_acc) else "",
+            "total_train_seconds": total_seconds,
+            "class_weights": json.dumps([float(x) for x in class_weights_np.tolist()]),
+            "notes": "",
+        }
+        update_master_runs_csv(args.master_csv, master_row)
+        log(f"Updated master CSV     : {args.master_csv}")
 
     log(f"Training finished in {total_seconds:.1f}s")
     log(f"Best epoch            : {best_epoch}")
     log(f"Best val macro F1     : {best_val_macro_f1:.4f}")
     log(f"Best val loss         : {best_val_loss:.5f}")
+    if test_done:
+        log(f"Test macro F1         : {test_macro_f1:.4f}")
+        log(f"Test balanced acc     : {test_bal_acc:.4f}")
     log(f"Saved summary         : {summary_json_path}")
     log(f"Saved history         : {history_csv_path}")
     log(f"Saved best model      : {best_ckpt_path}")
-    log(f"Saved val confusion   : {cm_csv_path}")
+    log(f"Saved val confusion   : {cm_val_csv_path}")
     log(f"Saved val predictions : {val_preds_csv_path}")
+    log(f"Saved val per-class   : {per_class_val_csv_path}")
+    if test_done:
+        log(f"Saved test confusion  : {cm_test_csv_path}")
+        log(f"Saved test predictions: {test_preds_csv_path}")
+        log(f"Saved test per-class  : {per_class_test_csv_path}")
 
 
 if __name__ == "__main__":
