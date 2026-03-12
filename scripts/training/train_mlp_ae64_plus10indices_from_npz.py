@@ -30,12 +30,10 @@ This script:
         - confusion_matrix_test.csv
         - test_predictions.csv
         - per_class_metrics_test.csv
-- auto-updates:
-    runs/mlp_ae64plus10idx_master_runs.csv
 
 Example:
 python scripts/training/train_mlp_ae64_plus10indices_from_npz.py \
-  --data data/processed/training/ae64_plus10indices_samples_4upazila_2023.npz \
+  --data data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz \
   --outdir runs/mlp_ae64plus10idx_h512-256_do02_lr1e3_bs4096_v1 \
   --hidden 512 256 \
   --dropout 0.2 \
@@ -52,6 +50,7 @@ python scripts/training/train_mlp_ae64_plus10indices_from_npz.py \
   --eval-every 1 \
   --device cuda \
   --seed 42
+
 Notes:
 - Labels are expected to be class IDs 1..10.
 - Internally the model uses 0..9 for PyTorch cross-entropy.
@@ -68,7 +67,7 @@ import time
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -78,7 +77,6 @@ from torch.utils.data import DataLoader, TensorDataset
 
 JST = timezone(timedelta(hours=9))
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-MASTER_CSV_DEFAULT = PROJECT_ROOT / "runs" / "mlp_ae64plus10idx_master_runs.csv"
 NUM_CLASSES_FIXED = 10
 
 
@@ -103,8 +101,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--data",
         type=Path,
-        required=True,
-        help="Input NPZ file containing X_train/X_val/y_train/y_val/mu/sigma.",
+        default=Path("data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz"),
+        help="Input NPZ file containing X_train/X_val/y_train/y_val/mu/sigma and optionally X_test/y_test.",
     )
     p.add_argument(
         "--outdir",
@@ -202,17 +200,6 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=42,
         help="Random seed (default: 42).",
-    )
-    p.add_argument(
-        "--master-csv",
-        type=Path,
-        default=MASTER_CSV_DEFAULT,
-        help="Master runs CSV path (default: runs/mlp_ae64plus10idx_master_runs.csv).",
-    )
-    p.add_argument(
-        "--no-master-update",
-        action="store_true",
-        help="Disable auto-update of master runs CSV.",
     )
     return p.parse_args()
 
@@ -484,77 +471,10 @@ def load_best_checkpoint_for_eval(
     return model, ckpt
 
 
-def update_master_runs_csv(master_csv_path: Path, row: Dict[str, object]) -> None:
-    master_csv_path.parent.mkdir(parents=True, exist_ok=True)
-
-    fieldnames = [
-        "run_dir",
-        "timestamp_jst",
-        "data_npz",
-        "model",
-        "seed",
-        "input_dim",
-        "num_classes",
-        "hidden_dims",
-        "dropout",
-        "batch_size",
-        "epochs_requested",
-        "epochs_completed",
-        "lr",
-        "weight_decay",
-        "label_smoothing",
-        "scheduler",
-        "scheduler_factor",
-        "scheduler_patience",
-        "patience",
-        "min_delta",
-        "train_samples",
-        "val_samples",
-        "test_samples",
-        "best_epoch",
-        "best_val_loss",
-        "best_val_acc",
-        "best_val_macro_f1",
-        "best_val_balanced_acc",
-        "test_loss",
-        "test_acc",
-        "test_macro_f1",
-        "test_balanced_acc",
-        "total_train_seconds",
-        "class_weights",
-        "notes",
-    ]
-
-    existing_rows: List[Dict[str, str]] = []
-    if master_csv_path.exists():
-        with master_csv_path.open("r", newline="") as f:
-            reader = csv.DictReader(f)
-            for r in reader:
-                existing_rows.append(dict(r))
-
-    run_dir_str = str(row["run_dir"])
-    replaced = False
-    for i, r in enumerate(existing_rows):
-        if r.get("run_dir") == run_dir_str:
-            existing_rows[i] = {k: str(row.get(k, "")) for k in fieldnames}
-            replaced = True
-            break
-
-    if not replaced:
-        existing_rows.append({k: str(row.get(k, "")) for k in fieldnames})
-
-    with master_csv_path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for r in existing_rows:
-            writer.writerow(r)
-
-
 def main() -> None:
     args = parse_args()
     args.data = resolve_path(args.data)
     args.outdir = resolve_path(args.outdir)
-    args.master_csv = resolve_path(args.master_csv)
     args.outdir.mkdir(parents=True, exist_ok=True)
 
     if not args.data.exists():
@@ -983,47 +903,6 @@ def main() -> None:
     }
 
     write_json(summary_json_path, summary)
-
-    if not args.no_master_update:
-        master_row = {
-            "run_dir": str(args.outdir),
-            "timestamp_jst": summary["created_at_jst"],
-            "data_npz": str(args.data),
-            "model": "MLPClassifier",
-            "seed": args.seed,
-            "input_dim": input_dim,
-            "num_classes": num_classes,
-            "hidden_dims": "-".join(str(x) for x in args.hidden),
-            "dropout": args.dropout,
-            "batch_size": args.batch_size,
-            "epochs_requested": args.epochs,
-            "epochs_completed": len(history),
-            "lr": args.lr,
-            "weight_decay": args.weight_decay,
-            "label_smoothing": args.label_smoothing,
-            "scheduler": args.scheduler,
-            "scheduler_factor": args.scheduler_factor,
-            "scheduler_patience": args.scheduler_patience,
-            "patience": args.patience,
-            "min_delta": args.min_delta,
-            "train_samples": int(X_train.shape[0]),
-            "val_samples": int(X_val.shape[0]),
-            "test_samples": int(X_test.shape[0]) if has_test and X_test is not None else 0,
-            "best_epoch": best_epoch,
-            "best_val_loss": best_val_loss if np.isfinite(best_val_loss) else "",
-            "best_val_acc": best_val_acc if np.isfinite(best_val_acc) else "",
-            "best_val_macro_f1": best_val_macro_f1 if np.isfinite(best_val_macro_f1) else "",
-            "best_val_balanced_acc": best_val_bal_acc if np.isfinite(best_val_bal_acc) else "",
-            "test_loss": test_loss if np.isfinite(test_loss) else "",
-            "test_acc": test_acc if np.isfinite(test_acc) else "",
-            "test_macro_f1": test_macro_f1 if np.isfinite(test_macro_f1) else "",
-            "test_balanced_acc": test_bal_acc if np.isfinite(test_bal_acc) else "",
-            "total_train_seconds": total_seconds,
-            "class_weights": json.dumps([float(x) for x in class_weights_np.tolist()]),
-            "notes": "",
-        }
-        update_master_runs_csv(args.master_csv, master_row)
-        log(f"Updated master CSV     : {args.master_csv}")
 
     log(f"Training finished in {total_seconds:.1f}s")
     log(f"Best epoch            : {best_epoch}")
