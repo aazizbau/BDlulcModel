@@ -794,7 +794,7 @@ def main() -> None:
                     "best_val_loss": best_val_loss,
                     "best_val_acc": best_val_acc,
                     "best_val_balanced_acc": best_val_bal_acc,
-                    "args": agrs_serializable,
+                    "args": args_serializable,
                     "data_meta": meta,
                 },
                 best_ckpt_path,
