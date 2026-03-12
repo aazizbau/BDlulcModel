@@ -606,6 +606,14 @@ def main() -> None:
         pin_memory=pin_memory,
         drop_last=False,
     )
+    train_eval_loader = DataLoader(
+        train_ds,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=0,
+        pin_memory=pin_memory,
+        drop_last=False,
+    )
     val_loader = DataLoader(
         val_ds,
         batch_size=args.batch_size,
@@ -679,11 +687,6 @@ def main() -> None:
         epoch_start = time.time()
         model.train()
 
-        running_loss = 0.0
-        running_n = 0
-        train_true_parts: List[np.ndarray] = []
-        train_pred_parts: List[np.ndarray] = []
-
         for xb, yb in train_loader:
             xb = xb.to(device, non_blocking=True)
             yb = yb.to(device, non_blocking=True)
@@ -694,23 +697,17 @@ def main() -> None:
             loss.backward()
             optimizer.step()
 
-            n = xb.size(0)
-            running_loss += float(loss.item()) * n
-            running_n += n
-
-            pred = torch.argmax(logits, dim=1)
-            train_true_parts.append(yb.detach().cpu().numpy())
-            train_pred_parts.append(pred.detach().cpu().numpy())
-
-        train_loss = running_loss / running_n if running_n > 0 else math.nan
-        y_train_true_ep = np.concatenate(train_true_parts) if train_true_parts else np.zeros((0,), dtype=np.int64)
-        y_train_pred_ep = np.concatenate(train_pred_parts) if train_pred_parts else np.zeros((0,), dtype=np.int64)
-        train_cm = confusion_matrix_np(y_train_true_ep, y_train_pred_ep, num_classes)
-        train_acc = accuracy_np(y_train_true_ep, y_train_pred_ep)
-        train_macro_f1 = macro_f1_from_cm(train_cm)
-
         should_eval = (epoch % args.eval_every == 0) or (epoch == args.epochs)
+
         if should_eval:
+            train_loss, train_acc, train_macro_f1, _, _, _ = evaluate(
+                model=model,
+                loader=train_eval_loader,
+                criterion=criterion,
+                device=device,
+                num_classes=num_classes,
+            )
+
             val_loss, val_acc, val_macro_f1, val_bal_acc, y_val_true_ep, y_val_pred_ep = evaluate(
                 model=model,
                 loader=val_loader,
@@ -719,6 +716,9 @@ def main() -> None:
                 num_classes=num_classes,
             )
         else:
+            train_loss = math.nan
+            train_acc = math.nan
+            train_macro_f1 = math.nan
             val_loss = math.nan
             val_acc = math.nan
             val_macro_f1 = math.nan
@@ -756,7 +756,6 @@ def main() -> None:
             log(
                 f"Epoch {epoch:03d} | "
                 f"lr={current_lr:.6g} | "
-                f"train_loss={train_loss:.5f} train_acc={train_acc:.4f} train_macro_f1={train_macro_f1:.4f} | "
                 f"time={epoch_seconds:.1f}s"
             )
 
