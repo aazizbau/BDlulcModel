@@ -459,7 +459,7 @@ def load_best_checkpoint_for_eval(
     ckpt_path: Path,
     device: torch.device,
 ) -> Tuple[nn.Module, Dict]:
-    ckpt = torch.load(ckpt_path, map_location=device)
+    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     model = MLPClassifier(
         input_dim=int(ckpt["input_dim"]),
         hidden_dims=list(ckpt["hidden_dims"]),
@@ -476,6 +476,13 @@ def main() -> None:
     args.data = resolve_path(args.data)
     args.outdir = resolve_path(args.outdir)
     args.outdir.mkdir(parents=True, exist_ok=True)
+
+    args_serializable = {}
+    for k, v in vars(args).items():
+        if isinstance(v, Path):
+            args_serializable[k] = str(v)
+        else:
+            args_serializable[k] = v
 
     if not args.data.exists():
         raise SystemExit(f"Input NPZ not found: {args.data}")
@@ -787,7 +794,7 @@ def main() -> None:
                     "best_val_loss": best_val_loss,
                     "best_val_acc": best_val_acc,
                     "best_val_balanced_acc": best_val_bal_acc,
-                    "args": vars(args),
+                    "args": agrs_serializable,
                     "data_meta": meta,
                 },
                 best_ckpt_path,
