@@ -2,9 +2,11 @@
 Download Google AlphaEarth satellite embeddings for the Bangladesh coastal region (tiled).
 
 Usage:
+    export GEE_PROJECT_ID="your-ee-project-id"
+
     python scripts/gee/download_alphaearth_embeddings.py \
         --year 2024 \
-        --project ee-your-project-id \
+        --project "${GEE_PROJECT_ID}" \
         --output data/raw/embeddings/bd_coastal_alphaearth_2024.tif \
         --tile-width-km 2.5 --tile-height-km 2.5
 """
@@ -13,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 from pathlib import Path
 from typing import Iterable, Sequence, Tuple
 
@@ -21,6 +24,7 @@ import geemap
 
 
 AOI_NAME = "BD_COASTAL_DISREI"
+GEE_PROJECT_ENV = "GEE_PROJECT_ID"
 BD_COASTAL_BBOX = [
     [88.4663, 23.5885],  # upper left
     [88.6038, 20.2039],  # lower left
@@ -32,6 +36,7 @@ BD_COASTAL_BBOX = [
 
 def initialize_earth_engine(project: str | None = None) -> None:
     """Authenticate and initialize Google Earth Engine."""
+    project = project or os.environ.get(GEE_PROJECT_ENV)
     try:
         if project:
             ee.Initialize(project=project)
@@ -208,8 +213,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--project",
         type=str,
-        default=None,
-        help="Optional Earth Engine project ID for initialization.",
+        default=os.environ.get(GEE_PROJECT_ENV),
+        help=f'Optional Earth Engine project ID for initialization (default: env "{GEE_PROJECT_ENV}").',
     )
     parser.add_argument(
         "--tile-width-km",

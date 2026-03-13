@@ -51,6 +51,7 @@ MAX_RETRIES = 6
 RETRY_SLEEP = 10
 
 NODATA = 65535  # uint16-safe nodata fill
+GEE_PROJECT_ENV = "GEE_PROJECT_ID"
 
 BAND_20M = {"B5", "B6", "B7", "B8A", "B11", "B12"}
 
@@ -65,7 +66,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     p.add_argument("--year", type=int, required=True)
     p.add_argument("--band", type=str, required=True)
     p.add_argument("--aoi", type=Path, default=Path("configs/bd_coastal_aoi.yaml"))
-    p.add_argument("--project", type=str, default=None)
+    p.add_argument("--project", type=str, default=os.environ.get(GEE_PROJECT_ENV))
     p.add_argument("--outdir", type=Path, default=Path("data/raw/sentinel_gemini"))
     p.add_argument("--resume", action="store_true", help="Resume by reusing existing tiles")
 

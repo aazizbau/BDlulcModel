@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -17,6 +18,8 @@ from download_s2_octdec import (
     NODATA, BAND_20M, SCALE_DEFAULT, CRS_DEFAULT
 )
 
+GEE_PROJECT_ENV = "GEE_PROJECT_ID"
+
 def run(cmd):
     subprocess.run(cmd, check=True)
 
@@ -25,13 +28,18 @@ def main():
     p.add_argument("--year", type=int, required=True)
     p.add_argument("--band", type=str, required=True)
     p.add_argument("--aoi", type=Path, default=Path("configs/bd_coastal_aoi.yaml"))
-    p.add_argument("--project", type=str, required=True)
+    p.add_argument("--project", type=str, default=os.environ.get(GEE_PROJECT_ENV))
     p.add_argument("--outdir", type=Path, default=Path("data/raw/sentinel_gemini"))
     p.add_argument("--tile-deg", type=float, default=0.125)
     p.add_argument("--scale", type=float, default=10.0)
     p.add_argument("--crs", type=str, default=CRS_DEFAULT)
     p.add_argument("--cloud-threshold", type=float, default=0.60)
     args = p.parse_args()
+
+    if not args.project:
+        raise SystemExit(
+            f'Missing GEE project ID. Set --project or export {GEE_PROJECT_ENV}="your-ee-project-id".'
+        )
 
     initialize_earth_engine(project=args.project)
 

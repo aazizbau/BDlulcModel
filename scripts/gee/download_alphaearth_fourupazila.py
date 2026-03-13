@@ -2,9 +2,11 @@
 Download Google AlphaEarth satellite embeddings for the Four Upazila region (tiled).
 
 Usage:
+    export GEE_PROJECT_ID="your-ee-project-id"
+
     python scripts/gee/download_alphaearth_fourupazila.py \
         --year 2023 \
-        --project ee-your-project-id \
+        --project "${GEE_PROJECT_ID}" \
         --output data/raw/embeddings/fourupazila/bd_coastal_fourupazila_alphaearth_2023.tif \
         --crs EPSG:32646
 """
@@ -13,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 from pathlib import Path
 from typing import Iterable, Sequence, Tuple
 
@@ -21,6 +24,7 @@ import geemap
 
 
 AOI_NAME = "FOUR_UPAZILA"
+GEE_PROJECT_ENV = "GEE_PROJECT_ID"
 FOURUPAZILA_BBOX = [
     [89.9086, 22.5764],  # upper left
     [89.8955, 21.7451],  # lower left
@@ -32,6 +36,7 @@ FOURUPAZILA_BBOX = [
 
 def initialize_earth_engine(project: str | None = None) -> None:
     """Authenticate and initialize Google Earth Engine."""
+    project = project or os.environ.get(GEE_PROJECT_ENV)
     try:
         if project:
             ee.Initialize(project=project)
@@ -206,8 +211,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--project",
         type=str,
-        default=None,
-        help="Optional Earth Engine project ID for initialization.",
+        default=os.environ.get(GEE_PROJECT_ENV),
+        help=f'Optional Earth Engine project ID for initialization (default: env "{GEE_PROJECT_ENV}").',
     )
     parser.add_argument(
         "--tile-width-km",

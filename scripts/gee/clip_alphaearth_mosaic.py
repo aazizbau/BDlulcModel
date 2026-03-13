@@ -45,7 +45,9 @@ from rasterio.warp import calculate_default_transform, reproject, transform_geom
 
 DEFAULT_INPUT = Path("data/interim/bd_coastal_alphaearth_2024_mosaic.tif")
 DEFAULT_OUTPUT = Path("data/processed/features/bd_coastal_alphaearth_2024_clipped.tif")
-DEFAULT_VECTOR = Path("/media/abdul-aziz/sdb7/masters_research/bd_coastal_map/bd_coastal_map_solid_gp.gpkg")
+DEFAULT_VECTOR = Path(
+    os.environ.get("BD_COASTAL_VECTOR_PATH", "data/raw/vector/bd_coastal_map_solid.gpkg")
+)
 DEFAULT_CACHE_MB = 4096
 
 

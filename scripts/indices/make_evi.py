@@ -5,13 +5,14 @@ Compute EVI from Sentinel-2 coastal mosaics (B02 blue, B04 red, B08 NIR) and wri
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import numpy as np
 import rasterio
 
 
-DEFAULT_BASE = Path("/media/abdul-aziz/345E19F75E19B29A/bd_coastal_tiles")
+DEFAULT_BASE = Path(os.environ.get("BD_COASTAL_TILES_DIR", "data/raw/bd_coastal_tiles"))
 DEFAULT_OUTPUT_CRS = "EPSG:32646"
 DEFAULT_SCALE = 1 / 10000.0
 

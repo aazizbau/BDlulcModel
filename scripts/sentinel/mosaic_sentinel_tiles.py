@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import math
 import numpy as np
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -30,7 +31,7 @@ def log(message: str) -> None:
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    default_base = Path("/media/abdul-aziz/345E19F75E19B29A/bd_coastal_tiles")
+    default_base = Path(os.environ.get("BD_COASTAL_TILES_DIR", "data/raw/bd_coastal_tiles"))
     parser = argparse.ArgumentParser(
         description="Mosaic Sentinel-2 JP2 tiles for a specific band/year/resolution."
     )

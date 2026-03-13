@@ -10,6 +10,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -29,7 +30,7 @@ def log(msg: str) -> None:
 # CLI
 # ---------------------------------------------------------------------
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    default_base = Path("/media/abdul-aziz/345E19F75E19B29A/bd_coastal_tiles")
+    default_base = Path(os.environ.get("BD_COASTAL_TILES_DIR", "data/raw/bd_coastal_tiles"))
 
     p = argparse.ArgumentParser(
         description="Mosaic Sentinel-2 JP2 tiles using GDAL VRT + gdalwarp -tap"

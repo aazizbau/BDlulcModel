@@ -10,6 +10,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 from typing import Tuple
 
@@ -17,7 +18,7 @@ import numpy as np
 import rasterio
 
 
-DEFAULT_BASE = Path("/media/abdul-aziz/345E19F75E19B29A/bd_coastal_tiles")
+DEFAULT_BASE = Path(os.environ.get("BD_COASTAL_TILES_DIR", "data/raw/bd_coastal_tiles"))
 DEFAULT_OUTPUT_CRS = "EPSG:32646"
 
 

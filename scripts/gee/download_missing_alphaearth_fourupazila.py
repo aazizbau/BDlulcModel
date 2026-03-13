@@ -2,9 +2,11 @@
 Download missing AlphaEarth embeddings tiles for the Four Upazila region.
 
 Usage:
+    export GEE_PROJECT_ID="your-ee-project-id"
+
     python scripts/gee/download_missing_alphaearth_fourupazila.py \
         --year 2023 \
-        --project ee-your-project-id \
+        --project "${GEE_PROJECT_ID}" \
         --output data/raw/embeddings/fourupazila/bd_coastal_fourupazila_alphaearth_2023.tif \
         --crs EPSG:32646
 """
@@ -12,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -23,6 +26,8 @@ if str(PROJECT_ROOT) not in sys.path:
 import geemap
 
 from scripts.gee import download_alphaearth_fourupazila as downloader
+
+GEE_PROJECT_ENV = "GEE_PROJECT_ID"
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -61,8 +66,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--project",
         type=str,
-        default=None,
-        help="Optional Earth Engine project ID for initialization.",
+        default=os.environ.get(GEE_PROJECT_ENV),
+        help=f'Optional Earth Engine project ID for initialization (default: env "{GEE_PROJECT_ENV}").',
     )
     parser.add_argument(
         "--tile-width-km",

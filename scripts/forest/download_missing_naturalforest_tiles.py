@@ -9,6 +9,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Iterable, Sequence, Tuple
@@ -21,6 +22,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.forest import download_naturalforest as downloader
+
+GEE_PROJECT_ENV = "GEE_PROJECT_ID"
 
 
 def list_missing_tiles(
@@ -114,8 +117,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--project",
         type=str,
-        default=None,
-        help="Optional Earth Engine project ID.",
+        default=os.environ.get(GEE_PROJECT_ENV),
+        help=f'Optional Earth Engine project ID (default: env "{GEE_PROJECT_ENV}").',
     )
     return parser.parse_args(argv)
 

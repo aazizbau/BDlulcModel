@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 from pathlib import Path
 from typing import Iterable, Sequence, Tuple
 
@@ -18,6 +19,7 @@ import geemap
 
 
 AOI_NAME = "BD_COASTAL_BBOX"
+GEE_PROJECT_ENV = "GEE_PROJECT_ID"
 BD_COASTAL_BBOX = [
     [88.4663, 23.5885],  # upper left
     [88.6038, 20.2039],  # lower left
@@ -34,6 +36,7 @@ COLLECTION_ID = (
 
 def initialize_earth_engine(project: str | None = None) -> None:
     """Authenticate and initialize Google Earth Engine."""
+    project = project or os.environ.get(GEE_PROJECT_ENV)
     try:
         if project:
             ee.Initialize(project=project)
@@ -182,8 +185,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--project",
         type=str,
-        default=None,
-        help="Optional GEE project ID to initialize with.",
+        default=os.environ.get(GEE_PROJECT_ENV),
+        help=f'Optional GEE project ID to initialize with (default: env "{GEE_PROJECT_ENV}").',
     )
     parser.add_argument(
         "--crs",

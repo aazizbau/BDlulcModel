@@ -9,6 +9,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -25,6 +26,8 @@ from scripts.forest.download_naturalforest import (
     iterate_tiles,
     resolve_output_template,
 )
+
+GEE_PROJECT_ENV = "GEE_PROJECT_ID"
 
 
 def check_tiles(
@@ -97,8 +100,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--project",
         type=str,
-        default=None,
-        help="Optional Earth Engine project ID.",
+        default=os.environ.get(GEE_PROJECT_ENV),
+        help=f'Optional Earth Engine project ID (default: env "{GEE_PROJECT_ENV}").',
     )
     return parser.parse_args(argv)
 
