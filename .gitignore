@@ -67,8 +67,6 @@ gee_credentials/
 # Misc
 .DS_Store
 Thumbs.db
-*.sh
-
 # Raster / EO data
 *.tif
 *.tiff
