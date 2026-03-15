@@ -432,8 +432,13 @@ def get_best_iteration(booster: xgb.Booster, fallback: int) -> int:
     return int(best_iter) + 1
 
 
-def predict_proba_best(booster: xgb.Booster, X: np.ndarray, best_iteration: int) -> np.ndarray:
-    dmat = xgb.DMatrix(X)
+def predict_proba_best(
+    booster: xgb.Booster,
+    X: np.ndarray,
+    best_iteration: int,
+    feature_names: List[str],
+) -> np.ndarray:
+    dmat = xgb.DMatrix(X, feature_names=feature_names)
     proba = booster.predict(dmat, iteration_range=(0, best_iteration))
     proba = np.asarray(proba, dtype=np.float32)
     if proba.ndim != 2 or proba.shape[1] != NUM_CLASSES_FIXED:
@@ -650,8 +655,8 @@ def main() -> None:
     save_history_csv(history_csv_path, flatten_eval_history(evals_result))
 
     log("Evaluating best model on train/val.")
-    y_train_proba = predict_proba_best(booster, X_train, best_iteration)
-    y_val_proba = predict_proba_best(booster, X_val, best_iteration)
+    y_train_proba = predict_proba_best(booster, X_train, best_iteration, feature_names_list)
+    y_val_proba = predict_proba_best(booster, X_val, best_iteration, feature_names_list)
 
     train_metrics = evaluate_from_proba(y_train_zero, y_train_proba, num_classes=num_classes)
     val_metrics = evaluate_from_proba(y_val_zero, y_val_proba, num_classes=num_classes)
@@ -671,7 +676,7 @@ def main() -> None:
 
     if has_test and X_test is not None and y_test_zero is not None:
         log("Evaluating best model on test split.")
-        y_test_proba = predict_proba_best(booster, X_test, best_iteration)
+        y_test_proba = predict_proba_best(booster, X_test, best_iteration, feature_names_list)
         test_metrics = evaluate_from_proba(y_test_zero, y_test_proba, num_classes=num_classes)
 
         test_loss = float(test_metrics["loss"])
