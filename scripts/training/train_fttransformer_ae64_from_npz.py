@@ -19,6 +19,8 @@ This script:
 - evaluates train/val each epoch using non-shuffled eval loaders
 - supports early stopping
 - optionally uses ReduceLROnPlateau
+- optionally uses AMP mixed precision
+- optionally uses gradient accumulation so effective batch size can be larger
 - saves:
     * best model checkpoint
     * summary.json
@@ -34,14 +36,15 @@ This script:
 Example:
 python scripts/training/train_fttransformer_ae64_from_npz.py \
   --data data/processed/training/ae64_samples_4upazila_2023_trainvaltest.npz \
-  --outdir runs/ftt_ae64_dt192_blk3_head8_attndo01_ffdo01_lr1e3_bs4096_v1 \
-  --d-token 192 \
-  --n-blocks 3 \
+  --outdir runs/ftt_ae64_dt128_blk2_head8_attndo01_ffdo01_lr1e3_bs512_acc4_amp_v1 \
+  --d-token 128 \
+  --n-blocks 2 \
   --n-heads 8 \
   --attention-dropout 0.1 \
   --ff-dropout 0.1 \
   --residual-dropout 0.0 \
-  --batch-size 4096 \
+  --batch-size 512 \
+  --grad-accum-steps 4 \
   --epochs 100 \
   --lr 1e-3 \
   --weight-decay 1e-4 \
@@ -52,6 +55,7 @@ python scripts/training/train_fttransformer_ae64_from_npz.py \
   --scheduler-factor 0.5 \
   --scheduler-patience 5 \
   --eval-every 1 \
+  --amp \
   --device cuda \
   --seed 42
 
@@ -60,6 +64,7 @@ Notes:
 - Internally the model uses 0..9 for PyTorch cross-entropy.
 - Expected input_dim is 64 for AE64-only features.
 - This FT-Transformer version treats each numerical feature as one token.
+- Effective batch size = batch_size * grad_accum_steps.
 """
 
 from __future__ import annotations
@@ -70,6 +75,7 @@ import json
 import math
 import random
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -161,7 +167,13 @@ def parse_args() -> argparse.Namespace:
         "--batch-size",
         type=int,
         default=8192,
-        help="Batch size (default: 8192).",
+        help="Physical batch size per forward pass (default: 8192).",
+    )
+    p.add_argument(
+        "--grad-accum-steps",
+        type=int,
+        default=1,
+        help="Gradient accumulation steps (default: 1). Effective batch = batch_size * grad_accum_steps.",
     )
     p.add_argument(
         "--epochs",
@@ -221,6 +233,11 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=1,
         help="Evaluate every N epochs (default: 1).",
+    )
+    p.add_argument(
+        "--amp",
+        action="store_true",
+        help="Enable automatic mixed precision on CUDA.",
     )
     p.add_argument(
         "--device",
@@ -456,12 +473,20 @@ def describe_label_presence(y: np.ndarray) -> Dict[str, List[int]]:
     return {"present": present, "missing": missing}
 
 
+def make_autocast_context(device: torch.device, amp_enabled: bool):
+    enabled = amp_enabled and device.type == "cuda"
+    if enabled:
+        return torch.amp.autocast(device_type="cuda", dtype=torch.float16)
+    return nullcontext()
+
+
 def evaluate(
     model: nn.Module,
     loader: DataLoader,
     criterion: nn.Module,
     device: torch.device,
     num_classes: int,
+    amp_enabled: bool,
 ) -> Tuple[float, float, float, float, np.ndarray, np.ndarray]:
     model.eval()
     total_loss = 0.0
@@ -474,8 +499,9 @@ def evaluate(
             xb = xb.to(device, non_blocking=True)
             yb = yb.to(device, non_blocking=True)
 
-            logits = model(xb)
-            loss = criterion(logits, yb)
+            with make_autocast_context(device, amp_enabled):
+                logits = model(xb)
+                loss = criterion(logits, yb)
 
             n = xb.size(0)
             total_loss += float(loss.item()) * n
@@ -602,6 +628,9 @@ def load_best_checkpoint_for_eval(
 def main() -> None:
     args = parse_args()
 
+    if args.grad_accum_steps < 1:
+        raise SystemExit("--grad-accum-steps must be >= 1")
+
     args.data = resolve_path(args.data)
     args.outdir = resolve_path(args.outdir)
     args.outdir.mkdir(parents=True, exist_ok=True)
@@ -618,6 +647,8 @@ def main() -> None:
 
     set_seed(args.seed)
     device = torch.device(args.device)
+    amp_enabled = bool(args.amp and device.type == "cuda")
+    effective_batch_size = int(args.batch_size * args.grad_accum_steps)
 
     log(f"Loading NPZ: {args.data}")
     with np.load(args.data, allow_pickle=True) as d:
@@ -706,6 +737,9 @@ def main() -> None:
     log(f"residual_dropout   : {args.residual_dropout}")
     log(f"ff_multiplier      : {args.ff_multiplier}")
     log(f"Batch size         : {args.batch_size}")
+    log(f"Grad accum steps   : {args.grad_accum_steps}")
+    log(f"Effective batch    : {effective_batch_size}")
+    log(f"AMP enabled        : {amp_enabled}")
     log(f"Epochs             : {args.epochs}")
     log(f"Learning rate      : {args.lr}")
     log(f"Weight decay       : {args.weight_decay}")
@@ -800,6 +834,8 @@ def main() -> None:
             patience=args.scheduler_patience,
         )
 
+    scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
+
     best_val_macro_f1 = -1.0
     best_epoch = -1
     best_val_loss = math.inf
@@ -827,20 +863,34 @@ def main() -> None:
         model.train()
         running_loss = 0.0
         running_n = 0
+        optimizer.zero_grad(set_to_none=True)
 
-        for xb, yb in train_loader:
+        for step_idx, (xb, yb) in enumerate(train_loader, start=1):
             xb = xb.to(device, non_blocking=True)
             yb = yb.to(device, non_blocking=True)
 
-            optimizer.zero_grad(set_to_none=True)
-            logits = model(xb)
-            loss = criterion(logits, yb)
-            loss.backward()
-            optimizer.step()
+            with make_autocast_context(device, amp_enabled):
+                logits = model(xb)
+                loss = criterion(logits, yb)
 
-            n = xb.size(0)
-            running_loss += float(loss.item()) * n
-            running_n += n
+            running_loss += float(loss.item()) * xb.size(0)
+            running_n += xb.size(0)
+
+            loss_for_backward = loss / args.grad_accum_steps
+
+            if amp_enabled:
+                scaler.scale(loss_for_backward).backward()
+            else:
+                loss_for_backward.backward()
+
+            should_step = (step_idx % args.grad_accum_steps == 0) or (step_idx == len(train_loader))
+            if should_step:
+                if amp_enabled:
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    optimizer.step()
+                optimizer.zero_grad(set_to_none=True)
 
         train_loss_step = running_loss / running_n if running_n > 0 else math.nan
         should_eval = (epoch % args.eval_every == 0) or (epoch == args.epochs)
@@ -852,6 +902,7 @@ def main() -> None:
                 criterion=criterion,
                 device=device,
                 num_classes=num_classes,
+                amp_enabled=amp_enabled,
             )
             val_loss, val_acc, val_macro_f1, val_bal_acc, y_val_true_ep, y_val_pred_ep = evaluate(
                 model=model,
@@ -859,6 +910,7 @@ def main() -> None:
                 criterion=criterion,
                 device=device,
                 num_classes=num_classes,
+                amp_enabled=amp_enabled,
             )
         else:
             train_loss = train_loss_step
@@ -944,6 +996,9 @@ def main() -> None:
                     "best_val_loss": best_val_loss,
                     "best_val_acc": best_val_acc,
                     "best_val_balanced_acc": best_val_bal_acc,
+                    "amp_enabled": amp_enabled,
+                    "grad_accum_steps": args.grad_accum_steps,
+                    "effective_batch_size": effective_batch_size,
                     "args": args_serializable,
                     "data_meta": meta,
                 },
@@ -993,6 +1048,7 @@ def main() -> None:
             criterion=criterion,
             device=device,
             num_classes=num_classes,
+            amp_enabled=amp_enabled,
         )
         test_cm = confusion_matrix_np(y_test_true_best, y_test_pred_best, num_classes)
         save_confusion_matrix_csv(cm_test_csv_path, test_cm)
@@ -1026,6 +1082,9 @@ def main() -> None:
         "residual_dropout": args.residual_dropout,
         "ff_multiplier": args.ff_multiplier,
         "batch_size": args.batch_size,
+        "grad_accum_steps": args.grad_accum_steps,
+        "effective_batch_size": effective_batch_size,
+        "amp_enabled": amp_enabled,
         "epochs_requested": args.epochs,
         "epochs_completed": len(history),
         "lr": args.lr,
