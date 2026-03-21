@@ -268,6 +268,22 @@ run_one "xgb_ae64plus10idx_lr0.03_ne5000_md8_mcw10_sub0.9_col0.7_g0.2_ra0.5_rl3.
 # ------------------------------------------------------------
 # Rebuild master CSV from summary.json files
 # ------------------------------------------------------------
+python scripts/training/build_master_csv.py \
+  --family xgboost \
+  --master-csv "$MASTER_CSV" \
+  --runs \
+  "xgb_ae64plus10idx_lr0.03_ne5000_md10_mcw3_sub0.8_col0.8_es200_v1" \
+  "xgb_ae64plus10idx_lr0.02_ne7000_md10_mcw3_sub0.8_col0.8_es300_v2" \
+  "xgb_ae64plus10idx_lr0.03_ne5000_md8_mcw5_sub0.8_col0.8_es200_v3" \
+  "xgb_ae64plus10idx_lr0.03_ne5000_md8_mcw8_sub0.8_col0.8_g0.1_ra0.0_rl2.0_es200_v4" \
+  "xgb_ae64plus10idx_lr0.03_ne5000_md9_mcw5_sub0.7_col0.8_g0.1_ra0.1_rl2.0_es200_v5" \
+  "xgb_ae64plus10idx_lr0.03_ne5000_md10_mcw5_sub0.7_col0.7_g0.2_ra0.1_rl2.0_es200_v6" \
+  "xgb_ae64plus10idx_lr0.05_ne3500_md8_mcw5_sub0.8_col0.8_es150_v7" \
+  "xgb_ae64plus10idx_lr0.02_ne8000_md9_mcw8_sub0.8_col0.8_g0.1_ra0.1_rl2.0_es300_v8" \
+  "xgb_ae64plus10idx_lr0.03_ne5000_md12_mcw8_sub0.8_col0.8_g0.2_ra0.1_rl2.0_es200_v9" \
+  "xgb_ae64plus10idx_lr0.03_ne5000_md8_mcw10_sub0.9_col0.7_g0.2_ra0.5_rl3.0_es200_v10"
+
+if false; then
 python - <<'PY'
 import csv
 import json
@@ -417,6 +433,7 @@ ts = datetime.now(JST).isoformat(timespec="seconds")
 print(f"[{ts}] Wrote master CSV: {master_csv}")
 print(f"[{ts}] Rows: {len(rows)}")
 PY
+fi
 
 echo
 echo "Done."

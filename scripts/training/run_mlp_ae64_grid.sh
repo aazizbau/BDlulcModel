@@ -256,6 +256,22 @@ run_one "mlp_ae64_h768-256_do025_lr1e3_bs4096_wd2e4_ls008_v10" \
 # ------------------------------------------------------------
 # Rebuild master CSV from summary.json files
 # ------------------------------------------------------------
+python scripts/training/build_master_csv.py \
+  --family mlp \
+  --master-csv "$MASTER_CSV" \
+  --runs \
+  "mlp_ae64_h512-256_do02_lr1e3_bs4096_v1" \
+  "mlp_ae64_h512-256_do03_lr1e3_bs4096_v2" \
+  "mlp_ae64_h512-256_do015_lr1e3_bs4096_v3" \
+  "mlp_ae64_h768-384_do02_lr1e3_bs4096_v4" \
+  "mlp_ae64_h1024-512_do03_lr1e3_bs4096_v5" \
+  "mlp_ae64_h512-256_do02_lr7e4_bs4096_v6" \
+  "mlp_ae64_h512-256_do02_lr15e3_bs4096_v7" \
+  "mlp_ae64_h512-256_do02_lr1e3_bs8192_v8" \
+  "mlp_ae64_h512-256_do02_lr1e3_bs4096_wd5e5_ls003_v9" \
+  "mlp_ae64_h768-256_do025_lr1e3_bs4096_wd2e4_ls008_v10"
+
+if false; then
 python - <<'PY'
 import json
 import csv
@@ -380,6 +396,7 @@ ts = datetime.now(JST).isoformat(timespec="seconds")
 print(f"[{ts}] Wrote master CSV: {master_csv}")
 print(f"[{ts}] Rows: {len(rows)}")
 PY
+fi
 
 echo
 echo "Done."

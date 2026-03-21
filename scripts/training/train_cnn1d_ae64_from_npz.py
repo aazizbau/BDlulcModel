@@ -82,6 +82,7 @@ from torch.utils.data import DataLoader, TensorDataset
 JST = timezone(timedelta(hours=9))
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 NUM_CLASSES_FIXED = 10
+EXPECTED_INPUT_DIM = 64
 
 
 def log(message: str) -> None:
@@ -392,13 +393,14 @@ def evaluate(
     criterion: nn.Module,
     device: torch.device,
     num_classes: int,
-) -> Tuple[float, float, float, float, np.ndarray, np.ndarray]:
+) -> Tuple[float, float, float, float, np.ndarray, np.ndarray, np.ndarray]:
     model.eval()
 
     total_loss = 0.0
     total_n = 0
     all_true: List[np.ndarray] = []
     all_pred: List[np.ndarray] = []
+    all_proba: List[np.ndarray] = []
 
     with torch.no_grad():
         for xb, yb in loader:
@@ -413,18 +415,21 @@ def evaluate(
             total_n += n
 
             pred = torch.argmax(logits, dim=1)
+            proba = torch.softmax(logits, dim=1)
             all_true.append(yb.cpu().numpy())
             all_pred.append(pred.cpu().numpy())
+            all_proba.append(proba.cpu().numpy())
 
     y_true = np.concatenate(all_true) if all_true else np.zeros((0,), dtype=np.int64)
     y_pred = np.concatenate(all_pred) if all_pred else np.zeros((0,), dtype=np.int64)
+    y_proba = np.concatenate(all_proba) if all_pred else np.zeros((0, num_classes), dtype=np.float32)
 
     cm = confusion_matrix_np(y_true, y_pred, num_classes)
     loss_avg = total_loss / total_n if total_n > 0 else math.nan
     acc = accuracy_np(y_true, y_pred)
     macro_f1 = macro_f1_from_cm(cm)
     bal_acc = balanced_acc_from_cm(cm)
-    return loss_avg, acc, macro_f1, bal_acc, y_true, y_pred
+    return loss_avg, acc, macro_f1, bal_acc, y_true, y_pred, y_proba
 
 
 def per_class_metrics_from_cm(cm: np.ndarray) -> List[Dict[str, float]]:
@@ -484,13 +489,24 @@ def save_confusion_matrix_csv(path: Path, cm: np.ndarray) -> None:
             writer.writerow([str(i + 1)] + cm[i].tolist())
 
 
-def save_predictions_csv(path: Path, y_true_zero: np.ndarray, y_pred_zero: np.ndarray) -> None:
+def save_predictions_csv(
+    path: Path,
+    y_true_zero: np.ndarray,
+    y_pred_zero: np.ndarray,
+    y_proba: np.ndarray | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["y_true", "y_pred"])
-        for t, p in zip(y_true_zero, y_pred_zero):
-            writer.writerow([int(t) + 1, int(p) + 1])
+        header = ["y_true", "y_pred"]
+        if y_proba is not None:
+            header.extend([f"prob_class_{i}" for i in range(1, y_proba.shape[1] + 1)])
+        writer.writerow(header)
+        for i, (t, p) in enumerate(zip(y_true_zero, y_pred_zero)):
+            row = [int(t) + 1, int(p) + 1]
+            if y_proba is not None:
+                row.extend(float(x) for x in y_proba[i])
+            writer.writerow(row)
 
 
 def save_per_class_metrics_csv(path: Path, rows: List[Dict[str, float]]) -> None:
@@ -778,7 +794,7 @@ def main() -> None:
         should_eval = (epoch % args.eval_every == 0) or (epoch == args.epochs)
 
         if should_eval:
-            train_loss, train_acc, train_macro_f1, _, _, _ = evaluate(
+            train_loss, train_acc, train_macro_f1, _, _, _, _ = evaluate(
                 model=model,
                 loader=train_eval_loader,
                 criterion=criterion,
@@ -786,7 +802,7 @@ def main() -> None:
                 num_classes=num_classes,
             )
 
-            val_loss, val_acc, val_macro_f1, val_bal_acc, y_val_true_ep, y_val_pred_ep = evaluate(
+            val_loss, val_acc, val_macro_f1, val_bal_acc, y_val_true_ep, y_val_pred_ep, y_val_proba_ep = evaluate(
                 model=model,
                 loader=val_loader,
                 criterion=criterion,
@@ -803,6 +819,7 @@ def main() -> None:
             val_bal_acc = math.nan
             y_val_true_ep = np.zeros((0,), dtype=np.int64)
             y_val_pred_ep = np.zeros((0,), dtype=np.int64)
+            y_val_proba_ep = np.zeros((0, num_classes), dtype=np.float32)
 
         current_lr = float(optimizer.param_groups[0]["lr"])
         epoch_seconds = time.time() - epoch_start
@@ -882,7 +899,7 @@ def main() -> None:
 
             best_val_cm = confusion_matrix_np(y_val_true_ep, y_val_pred_ep, num_classes)
             save_confusion_matrix_csv(cm_val_csv_path, best_val_cm)
-            save_predictions_csv(val_preds_csv_path, y_val_true_ep, y_val_pred_ep)
+            save_predictions_csv(val_preds_csv_path, y_val_true_ep, y_val_pred_ep, y_val_proba_ep)
             save_per_class_metrics_csv(
                 per_class_val_csv_path,
                 per_class_metrics_from_cm(best_val_cm),
@@ -917,7 +934,7 @@ def main() -> None:
         log("Loading best checkpoint for final test evaluation.")
         best_model, _ = load_best_checkpoint_for_eval(best_ckpt_path, device=device)
 
-        test_loss, test_acc, test_macro_f1, test_bal_acc, y_test_true_best, y_test_pred_best = evaluate(
+        test_loss, test_acc, test_macro_f1, test_bal_acc, y_test_true_best, y_test_pred_best, y_test_proba_best = evaluate(
             model=best_model,
             loader=test_loader,
             criterion=criterion,
@@ -927,7 +944,7 @@ def main() -> None:
 
         test_cm = confusion_matrix_np(y_test_true_best, y_test_pred_best, num_classes)
         save_confusion_matrix_csv(cm_test_csv_path, test_cm)
-        save_predictions_csv(test_preds_csv_path, y_test_true_best, y_test_pred_best)
+        save_predictions_csv(test_preds_csv_path, y_test_true_best, y_test_pred_best, y_test_proba_best)
         save_per_class_metrics_csv(
             per_class_test_csv_path,
             per_class_metrics_from_cm(test_cm),
@@ -945,9 +962,12 @@ def main() -> None:
         "created_at_jst": datetime.now(JST).isoformat(timespec="seconds"),
         "data": str(args.data),
         "outdir": str(args.outdir),
+        "model": "CNN1D",
+        "model_type": "cnn1d_classifier",
         "seed": args.seed,
         "device": str(device),
         "input_dim": input_dim,
+        "expected_input_dim": EXPECTED_INPUT_DIM,
         "num_classes": num_classes,
         "channels": args.channels,
         "kernels": args.kernels,
@@ -989,6 +1009,7 @@ def main() -> None:
         "val_label_presence": val_presence,
         "test_label_presence": test_presence,
         "data_meta": meta,
+        "args": args_serializable,
     }
 
     write_json(summary_json_path, summary)

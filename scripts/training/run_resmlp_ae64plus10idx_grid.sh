@@ -258,6 +258,22 @@ run_one "resmlp_ae64plus10idx_h384-384-192_do03_lr6e4_bs4096_v10" \
 # ------------------------------------------------------------
 # Rebuild master CSV from summary.json files
 # ------------------------------------------------------------
+python scripts/training/build_master_csv.py \
+  --family resmlp \
+  --master-csv "$MASTER_CSV" \
+  --runs \
+  "resmlp_ae64plus10idx_h512-256_do02_lr1e3_bs4096_v1" \
+  "resmlp_ae64plus10idx_h512-256_do025_lr8e4_bs4096_v2" \
+  "resmlp_ae64plus10idx_h512-256_do03_lr7e4_bs4096_v3" \
+  "resmlp_ae64plus10idx_h256-256_do02_lr1e3_bs4096_v4" \
+  "resmlp_ae64plus10idx_h256-256-256_do025_lr8e4_bs4096_v5" \
+  "resmlp_ae64plus10idx_h512-512-256_do025_lr8e4_bs4096_v6" \
+  "resmlp_ae64plus10idx_h768-384_do03_lr7e4_bs4096_v7" \
+  "resmlp_ae64plus10idx_h512-256_do025_lr8e4_bs2048_v8" \
+  "resmlp_ae64plus10idx_h512-256_do02_lr8e4_bs8192_v9" \
+  "resmlp_ae64plus10idx_h384-384-192_do03_lr6e4_bs4096_v10"
+
+if false; then
 python - <<'PY'
 import csv
 import json
@@ -397,6 +413,7 @@ ts = datetime.now(JST).isoformat(timespec="seconds")
 print(f"[{ts}] Wrote master CSV: {master_csv}")
 print(f"[{ts}] Rows: {len(rows)}")
 PY
+fi
 
 echo
 echo "Done."

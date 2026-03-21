@@ -329,6 +329,22 @@ run_one "ftt_ae64plus10idx_dt96_blk3_head8_attndo015_ffdo01_lr7e4_bs256_acc4_amp
 # ------------------------------------------------------------
 # Rebuild master CSV from summary.json files
 # ------------------------------------------------------------
+python scripts/training/build_master_csv.py \
+  --family fttransformer \
+  --master-csv "$MASTER_CSV" \
+  --runs \
+  "ftt_ae64plus10idx_dt128_blk2_head8_attndo01_ffdo01_lr1e3_bs384_acc4_amp_v1" \
+  "ftt_ae64plus10idx_dt96_blk2_head8_attndo01_ffdo01_lr1e3_bs384_acc4_amp_v2" \
+  "ftt_ae64plus10idx_dt160_blk2_head8_attndo01_ffdo01_lr1e3_bs256_acc4_amp_v3" \
+  "ftt_ae64plus10idx_dt128_blk3_head8_attndo01_ffdo01_lr1e3_bs256_acc4_amp_v4" \
+  "ftt_ae64plus10idx_dt128_blk2_head8_attndo005_ffdo005_lr1e3_bs384_acc4_amp_v5" \
+  "ftt_ae64plus10idx_dt128_blk2_head8_attndo015_ffdo015_lr1e3_bs384_acc4_amp_v6" \
+  "ftt_ae64plus10idx_dt128_blk2_head8_attndo01_ffdo01_lr7e4_bs384_acc4_amp_v7" \
+  "ftt_ae64plus10idx_dt128_blk2_head8_attndo01_ffdo01_lr5e4_bs384_acc4_amp_v8" \
+  "ftt_ae64plus10idx_dt160_blk3_head8_attndo01_ffdo01_lr7e4_bs192_acc4_amp_v9" \
+  "ftt_ae64plus10idx_dt96_blk3_head8_attndo015_ffdo01_lr7e4_bs256_acc4_amp_v10"
+
+if false; then
 python - <<'PY'
 import csv
 import json
@@ -479,6 +495,7 @@ ts = datetime.now(JST).isoformat(timespec="seconds")
 print(f"[{ts}] Wrote master CSV: {master_csv}")
 print(f"[{ts}] Rows: {len(rows)}")
 PY
+fi
 
 echo
 echo "Done."

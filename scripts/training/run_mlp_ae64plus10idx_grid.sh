@@ -257,6 +257,22 @@ run_one "mlp_ae64plus10idx_h1024-512-256_do02_lr1e3_bs4096_v10" \
 # ------------------------------------------------------------
 log "Rebuilding master CSV: ${MASTER_CSV}"
 
+python scripts/training/build_master_csv.py \
+  --family mlp \
+  --master-csv "$MASTER_CSV" \
+  --runs \
+  "mlp_ae64plus10idx_h512-256_do02_lr1e3_bs4096_v1" \
+  "mlp_ae64plus10idx_h512-256_do01_lr1e3_bs4096_v2" \
+  "mlp_ae64plus10idx_h512-256_do03_lr1e3_bs4096_v3" \
+  "mlp_ae64plus10idx_h512-256_do02_lr5e4_bs4096_v4" \
+  "mlp_ae64plus10idx_h512-256_do02_lr1e3_wd5e5_bs4096_v5" \
+  "mlp_ae64plus10idx_h512-256_do02_lr1e3_ls000_bs4096_v6" \
+  "mlp_ae64plus10idx_h512-256_do02_lr1e3_ls002_bs4096_v7" \
+  "mlp_ae64plus10idx_h512-256_do02_lr1e3_bs2048_v8" \
+  "mlp_ae64plus10idx_h1024-512_do02_lr1e3_bs4096_v9" \
+  "mlp_ae64plus10idx_h1024-512-256_do02_lr1e3_bs4096_v10"
+
+if false; then
 python - <<'PY'
 import csv
 import json
@@ -415,5 +431,6 @@ if rows:
 else:
     print("[MASTER] no completed runs found")
 PY
+fi
 
 log "All done."

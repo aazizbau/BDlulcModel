@@ -283,6 +283,22 @@ run_one "cnn1d_ae64plus10idx_c32-64-128_k5-3-3_h128_do02_lr1e3_bs4096_wd5e4_v10"
 # ------------------------------------------------------------
 # Rebuild master CSV from summary.json files
 # ------------------------------------------------------------
+python scripts/training/build_master_csv.py \
+  --family cnn1d \
+  --master-csv "$MASTER_CSV" \
+  --runs \
+  "cnn1d_ae64plus10idx_c32-64-128_k5-3-3_h128_do02_lr1e3_bs4096_v1" \
+  "cnn1d_ae64plus10idx_c32-64-128_k7-5-3_h128_do02_lr1e3_bs4096_v2" \
+  "cnn1d_ae64plus10idx_c32-64-128_k5-3-3_h256_do02_lr1e3_bs4096_v3" \
+  "cnn1d_ae64plus10idx_c64-128-128_k5-3-3_h128_do02_lr1e3_bs4096_v4" \
+  "cnn1d_ae64plus10idx_c32-64-128_k5-3-3_h128_do03_lr1e3_bs4096_v5" \
+  "cnn1d_ae64plus10idx_c32-64-128_k5-3-3_h128_do015_lr1e3_bs4096_v6" \
+  "cnn1d_ae64plus10idx_c32-64-128_k5-3-3_h128_do02_lr7e4_bs4096_v7" \
+  "cnn1d_ae64plus10idx_c32-64-128_k5-3-3_h128_do02_lr15e4_bs4096_v8" \
+  "cnn1d_ae64plus10idx_c32-64-128_k5-3-3_h128_do02_lr1e3_bs8192_v9" \
+  "cnn1d_ae64plus10idx_c32-64-128_k5-3-3_h128_do02_lr1e3_bs4096_wd5e4_v10"
+
+if false; then
 python - <<'PY'
 import csv
 import json
@@ -422,6 +438,7 @@ ts = datetime.now(JST).isoformat(timespec="seconds")
 print(f"[{ts}] Wrote master CSV: {master_csv}")
 print(f"[{ts}] Rows: {len(rows)}")
 PY
+fi
 
 echo
 echo "Done."

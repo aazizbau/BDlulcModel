@@ -249,6 +249,22 @@ run_one "lgbm_ae64plus10idx_lr0.02_ne7000_nl191_mcs100_sub0.75_col0.75_ra0.2_rl1
 # ------------------------------------------------------------
 # Rebuild master CSV from summary.json files
 # ------------------------------------------------------------
+python scripts/training/build_master_csv.py \
+  --family lgbm \
+  --master-csv "$MASTER_CSV" \
+  --runs \
+  "lgbm_ae64plus10idx_lr0.03_ne5000_nl127_mcs50_sub0.8_col0.8_es200_v1" \
+  "lgbm_ae64plus10idx_lr0.03_ne5000_nl63_mcs50_sub0.8_col0.8_es200_v2" \
+  "lgbm_ae64plus10idx_lr0.03_ne5000_nl255_mcs50_sub0.8_col0.8_es200_v3" \
+  "lgbm_ae64plus10idx_lr0.03_ne5000_nl127_mcs100_sub0.8_col0.8_es200_v4" \
+  "lgbm_ae64plus10idx_lr0.03_ne5000_nl127_mcs200_sub0.8_col0.8_es200_v5" \
+  "lgbm_ae64plus10idx_lr0.02_ne7000_nl127_mcs50_sub0.8_col0.8_es250_v6" \
+  "lgbm_ae64plus10idx_lr0.05_ne4000_nl127_mcs50_sub0.8_col0.8_es150_v7" \
+  "lgbm_ae64plus10idx_lr0.03_ne5000_nl127_mcs50_sub0.7_col0.7_es200_v8" \
+  "lgbm_ae64plus10idx_lr0.03_ne5000_nl127_mcs100_sub0.8_col0.8_ra0.1_rl0.5_es200_v9" \
+  "lgbm_ae64plus10idx_lr0.02_ne7000_nl191_mcs100_sub0.75_col0.75_ra0.2_rl1.0_es250_v10"
+
+if false; then
 python - <<'PY'
 import csv
 import json
@@ -404,6 +420,7 @@ ts = datetime.now(JST).isoformat(timespec="seconds")
 print(f"[{ts}] Wrote master CSV: {master_csv}")
 print(f"[{ts}] Rows: {len(rows)}")
 PY
+fi
 
 echo
 echo "Done."

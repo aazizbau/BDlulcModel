@@ -75,6 +75,7 @@ import numpy as np
 JST = timezone(timedelta(hours=9))
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 NUM_CLASSES_FIXED = 10
+EXPECTED_INPUT_DIM = 64
 
 
 def log(message: str) -> None:
@@ -740,8 +741,11 @@ def main() -> None:
         "created_at_jst": datetime.now(JST).isoformat(timespec="seconds"),
         "data": str(args.data),
         "outdir": str(args.outdir),
+        "model": "LightGBM",
+        "model_type": "lgbm_classifier",
         "seed": args.seed,
         "input_dim": input_dim,
+        "expected_input_dim": EXPECTED_INPUT_DIM,
         "num_classes": num_classes,
         "train_samples": int(X_train.shape[0]),
         "val_samples": int(X_val.shape[0]),
