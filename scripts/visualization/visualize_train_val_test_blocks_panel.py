@@ -38,7 +38,7 @@ import argparse
 import io
 import json
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -125,9 +125,9 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def load_npz_and_meta(npz_path: Path) -> Tuple[Dict[str, np.ndarray], Dict]:
+def load_npz_and_meta(npz_path: Path) -> Tuple[Dict[str, int], Dict]:
     data = np.load(npz_path, allow_pickle=True)
-    required = ["rowcol_train", "rowcol_val", "rowcol_test", "meta"]
+    required = ["y_train", "y_val", "meta"]
     for key in required:
         if key not in data:
             raise KeyError(f"Missing required NPZ key: {key}")
@@ -144,56 +144,44 @@ def load_npz_and_meta(npz_path: Path) -> Tuple[Dict[str, np.ndarray], Dict]:
     else:
         raise TypeError("Could not decode NPZ 'meta' field")
 
-    arrays = {
-        "rowcol_train": np.asarray(data["rowcol_train"]),
-        "rowcol_val": np.asarray(data["rowcol_val"]),
-        "rowcol_test": np.asarray(data["rowcol_test"]),
+    sample_counts = {
+        "train": int(np.asarray(data["y_train"]).shape[0]),
+        "val": int(np.asarray(data["y_val"]).shape[0]),
+        "test": int(np.asarray(data["y_test"]).shape[0]) if "y_test" in data else 0,
     }
-    return arrays, meta
+    return sample_counts, meta
 
 
-def meta_to_affine(meta: Dict) -> Affine:
-    transform = meta["transform"]
-    if len(transform) < 6:
-        raise ValueError("meta['transform'] must have at least 6 values")
-    return Affine(
-        float(transform[0]),
-        float(transform[1]),
-        float(transform[2]),
-        float(transform[3]),
-        float(transform[4]),
-        float(transform[5]),
-    )
+def block_assign(row: int, col: int, block_px: int, seed: int) -> float:
+    br = row // block_px
+    bc = col // block_px
+    v = (br * 73856093) ^ (bc * 19349663) ^ (seed * 83492791)
+    v = v & 0xFFFFFFFFFFFFFFFF
+    return (v % 10_000_000) / 10_000_000.0
 
 
-def meta_to_crs(meta: Dict) -> CRS:
-    return CRS.from_user_input(meta["crs"])
-
-
-def rowscols_to_block_ids(rowcol: np.ndarray, block_px: int) -> np.ndarray:
-    rows = rowcol[:, 0].astype(np.int64)
-    cols = rowcol[:, 1].astype(np.int64)
-    br = rows // block_px
-    bc = cols // block_px
-    return np.stack([br, bc], axis=1)
-
-
-def unique_block_ids(rowcol: np.ndarray, block_px: int) -> np.ndarray:
-    return np.unique(rowscols_to_block_ids(rowcol, block_px), axis=0)
+def assign_split(u: float, val_frac: float, test_frac: float) -> str:
+    if u < test_frac:
+        return "test"
+    if u < (test_frac + val_frac):
+        return "val"
+    return "train"
 
 
 def choose_random_block(
-    train_blocks: np.ndarray,
-    val_blocks: np.ndarray,
-    test_blocks: np.ndarray,
+    block_infos: Sequence[Dict[str, Any]],
     rng: np.random.Generator,
-) -> Tuple[int, int]:
-    all_blocks = np.unique(
-        np.concatenate([train_blocks, val_blocks, test_blocks], axis=0),
-        axis=0,
-    )
+) -> Tuple[str, int, int]:
+    all_blocks: List[Tuple[str, int, int]] = []
+    for info in block_infos:
+        for split in ("train", "val", "test"):
+            blocks = info["blocks"][split]
+            for br, bc in blocks.tolist():
+                all_blocks.append((str(info["upazila"]), int(br), int(bc)))
+    if not all_blocks:
+        raise RuntimeError("No valid split blocks could be reconstructed from the label rasters.")
     idx = int(rng.integers(0, len(all_blocks)))
-    return int(all_blocks[idx, 0]), int(all_blocks[idx, 1])
+    return all_blocks[idx]
 
 
 def block_window_pixels(
@@ -229,12 +217,6 @@ def block_rectangles_in_window(
             continue
         rects.append((rr0, rr1, cc0, cc1))
     return rects
-
-
-def full_extent_from_meta(width: int, height: int, transform: Affine) -> Tuple[float, float, float, float]:
-    x0, y0 = rasterio.transform.xy(transform, 0, 0, offset="ul")
-    x1, y1 = rasterio.transform.xy(transform, height - 1, width - 1, offset="lr")
-    return min(x0, x1), max(x0, x1), min(y0, y1), max(y0, y1)
 
 
 def window_transform_from_meta(transform: Affine, r0: int, c0: int) -> Affine:
@@ -303,6 +285,199 @@ def read_gray_background(
         arr = np.zeros_like(arr, dtype=np.float32)
 
     return arr, transform, crs
+
+
+def read_gray_background_by_bounds(
+    raster_path: Path,
+    bounds: Tuple[float, float, float, float],
+    max_bg_size: int,
+) -> Tuple[np.ndarray, Affine, CRS]:
+    xmin, xmax, ymin, ymax = bounds
+    with rasterio.open(raster_path) as ds:
+        win = rasterio.windows.from_bounds(xmin, ymin, xmax, ymax, transform=ds.transform)
+        win = win.round_offsets().round_lengths()
+        win = win.intersection(Window(0, 0, ds.width, ds.height))
+
+        out_h = int(max(1, win.height))
+        out_w = int(max(1, win.width))
+
+        scale = max(out_h / max_bg_size, out_w / max_bg_size, 1.0)
+        read_h = max(1, int(round(out_h / scale)))
+        read_w = max(1, int(round(out_w / scale)))
+
+        arr = ds.read(
+            1,
+            window=win,
+            out_shape=(read_h, read_w),
+            resampling=Resampling.nearest,
+        ).astype(np.float32)
+
+        transform = ds.window_transform(win) * Affine.scale(win.width / read_w, win.height / read_h)
+        crs = ds.crs
+
+    finite = np.isfinite(arr)
+    if finite.any():
+        vals = arr[finite]
+        lo = np.percentile(vals, 2)
+        hi = np.percentile(vals, 98)
+        if hi <= lo:
+            lo = float(np.min(vals))
+            hi = float(np.max(vals))
+        if hi > lo:
+            arr = np.clip((arr - lo) / (hi - lo), 0, 1)
+        else:
+            arr = np.zeros_like(arr, dtype=np.float32)
+    else:
+        arr = np.zeros_like(arr, dtype=np.float32)
+
+    return arr, transform, crs
+
+
+def reconstruct_split_blocks(meta: Dict, chunk: int = 1024) -> Tuple[List[Dict[str, Any]], CRS]:
+    if "label_paths" not in meta or not meta["label_paths"]:
+        raise KeyError("meta['label_paths'] is required to reconstruct split blocks.")
+
+    block_px = int(meta["block_px"])
+    seed = int(meta["seed"])
+    val_frac = float(meta["val_frac"])
+    test_frac = float(meta["test_frac"])
+    label_nodata = int(meta.get("label_nodata", 0))
+    ae_nodata = float(meta.get("ae_nodata", 0.0))
+    ae_path = resolve_path(str(meta["ae_path"])) if meta.get("ae_path") else None
+
+    ae_src = rasterio.open(ae_path) if ae_path and ae_path.exists() else None
+    full_crs: CRS | None = None
+    infos: List[Dict[str, Any]] = []
+
+    try:
+        for upazila, raw_label_path in meta["label_paths"].items():
+            label_path = resolve_path(str(raw_label_path))
+            with rasterio.open(label_path) as lbl:
+                if full_crs is None:
+                    full_crs = CRS.from_user_input(lbl.crs)
+                elif CRS.from_user_input(lbl.crs) != full_crs:
+                    raise SystemExit(f"CRS mismatch across label rasters: {label_path}")
+
+                split_sets = {"train": set(), "val": set(), "test": set()}
+
+                if ae_src is not None:
+                    if lbl.crs != ae_src.crs:
+                        raise SystemExit(f"[{upazila}] CRS mismatch: label {lbl.crs} vs AE {ae_src.crs}")
+
+                    lbl_bounds = lbl.bounds
+                    ae_bounds = ae_src.bounds
+                    left = max(lbl_bounds.left, ae_bounds.left)
+                    right = min(lbl_bounds.right, ae_bounds.right)
+                    bottom = max(lbl_bounds.bottom, ae_bounds.bottom)
+                    top = min(lbl_bounds.top, ae_bounds.top)
+                    if left >= right or bottom >= top:
+                        continue
+
+                    lbl_win_full = rasterio.windows.from_bounds(left, bottom, right, top, transform=lbl.transform)
+                    ae_win_full = rasterio.windows.from_bounds(left, bottom, right, top, transform=ae_src.transform)
+                    lbl_win_full = lbl_win_full.round_offsets().round_lengths()
+                    ae_win_full = ae_win_full.round_offsets().round_lengths()
+
+                    h = min(int(lbl_win_full.height), int(ae_win_full.height))
+                    w = min(int(lbl_win_full.width), int(ae_win_full.width))
+                    lbl_r0 = int(lbl_win_full.row_off)
+                    lbl_c0 = int(lbl_win_full.col_off)
+                    ae_r0 = int(ae_win_full.row_off)
+                    ae_c0 = int(ae_win_full.col_off)
+                else:
+                    lbl_r0 = 0
+                    lbl_c0 = 0
+                    ae_r0 = 0
+                    ae_c0 = 0
+                    h = int(lbl.height)
+                    w = int(lbl.width)
+
+                for row_off in range(0, h, chunk):
+                    rh = min(chunk, h - row_off)
+                    for col_off in range(0, w, chunk):
+                        cw = min(chunk, w - col_off)
+                        lbl_win = Window(lbl_c0 + col_off, lbl_r0 + row_off, cw, rh)
+                        y = lbl.read(1, window=lbl_win)
+                        valid_mask = (y != label_nodata) & (y >= 1) & (y <= 10)
+                        if not np.any(valid_mask):
+                            continue
+
+                        if ae_src is not None:
+                            ae_win = Window(ae_c0 + col_off, ae_r0 + row_off, cw, rh)
+                            X_ae = ae_src.read(list(range(1, ae_src.count + 1)), window=ae_win).astype(np.float32)
+                            if ae_nodata == 0.0:
+                                ae_valid = np.all(X_ae != 0.0, axis=0)
+                            else:
+                                ae_valid = np.all(X_ae != ae_nodata, axis=0)
+                            ae_valid &= np.all(np.isfinite(X_ae), axis=0)
+                            valid_mask &= ae_valid
+                            if not np.any(valid_mask):
+                                continue
+
+                        rows, cols = np.where(valid_mask)
+                        if rows.size == 0:
+                            continue
+
+                        global_rows = rows + int(lbl_win.row_off)
+                        global_cols = cols + int(lbl_win.col_off)
+                        block_ids = np.unique(
+                            np.stack([global_rows // block_px, global_cols // block_px], axis=1),
+                            axis=0,
+                        )
+                        for br, bc in block_ids:
+                            split = assign_split(
+                                u=block_assign(int(br * block_px), int(bc * block_px), block_px, seed),
+                                val_frac=val_frac,
+                                test_frac=test_frac,
+                            )
+                            split_sets[split].add((int(br), int(bc)))
+
+                infos.append(
+                    {
+                        "upazila": str(upazila),
+                        "label_path": label_path,
+                        "transform": lbl.transform,
+                        "crs": CRS.from_user_input(lbl.crs),
+                        "width": int(lbl.width),
+                        "height": int(lbl.height),
+                        "extent": (lbl.bounds.left, lbl.bounds.right, lbl.bounds.bottom, lbl.bounds.top),
+                        "blocks": {
+                            split: (
+                                np.array(sorted(split_sets[split]), dtype=np.int64)
+                                if split_sets[split]
+                                else np.zeros((0, 2), dtype=np.int64)
+                            )
+                            for split in ("train", "val", "test")
+                        },
+                    }
+                )
+    finally:
+        if ae_src is not None:
+            ae_src.close()
+
+    if full_crs is None:
+        raise RuntimeError("No valid label rasters were found for split reconstruction.")
+    return infos, full_crs
+
+
+def union_extent(extents: Sequence[Tuple[float, float, float, float]]) -> Tuple[float, float, float, float]:
+    xmin = min(e[0] for e in extents)
+    xmax = max(e[1] for e in extents)
+    ymin = min(e[2] for e in extents)
+    ymax = max(e[3] for e in extents)
+    return xmin, xmax, ymin, ymax
+
+
+def block_ids_to_rects(block_ids: np.ndarray, block_px: int) -> List[Tuple[int, int, int, int]]:
+    return [
+        (
+            int(br * block_px),
+            int(br * block_px + block_px),
+            int(bc * block_px),
+            int(bc * block_px + block_px),
+        )
+        for br, bc in block_ids
+    ]
 
 
 def decimal_to_dm(value: float, kind: str) -> str:
@@ -527,83 +702,55 @@ def main() -> None:
     rng = np.random.default_rng(args.seed)
 
     npz_path = resolve_path(args.npz)
-    background_path = resolve_path(args.background) if args.background else None
     outfig_path = resolve_path(args.outfig)
     north_arrow_path = resolve_path(args.north_arrow)
 
-    arrays, meta = load_npz_and_meta(npz_path)
+    sample_counts, meta = load_npz_and_meta(npz_path)
+    block_infos, full_crs = reconstruct_split_blocks(meta)
 
     block_px = int(meta["block_px"])
-    width = int(meta["width"])
-    height = int(meta["height"])
-    full_transform = meta_to_affine(meta)
-    full_crs = meta_to_crs(meta)
+    background_path = resolve_path(args.background) if args.background else None
+    if background_path is None and meta.get("ae_path"):
+        candidate_bg = resolve_path(str(meta["ae_path"]))
+        background_path = candidate_bg if candidate_bg.exists() else None
 
-    rowcol_train = arrays["rowcol_train"]
-    rowcol_val = arrays["rowcol_val"]
-    rowcol_test = arrays["rowcol_test"]
+    selected_upazila, selected_br, selected_bc = choose_random_block(block_infos, rng)
+    selected_info = next(info for info in block_infos if info["upazila"] == selected_upazila)
 
-    train_blocks = unique_block_ids(rowcol_train, block_px)
-    val_blocks = unique_block_ids(rowcol_val, block_px)
-    test_blocks = unique_block_ids(rowcol_test, block_px)
-
-    selected_block = choose_random_block(train_blocks, val_blocks, test_blocks, rng)
     r0, r1, c0, c1 = block_window_pixels(
-        selected_block,
+        (selected_br, selected_bc),
         block_px,
-        height,
-        width,
+        int(selected_info["height"]),
+        int(selected_info["width"]),
         args.context_blocks,
     )
 
     zoom_h = r1 - r0
     zoom_w = c1 - c0
-    zoom_transform = window_transform_from_meta(full_transform, r0, c0)
+    zoom_transform = window_transform_from_meta(selected_info["transform"], r0, c0)
     zoom_extent = extent_from_window_shape_transform(zoom_h, zoom_w, zoom_transform)
-    full_extent = full_extent_from_meta(width, height, full_transform)
+    full_extent = union_extent([info["extent"] for info in block_infos])
 
-    train_rects_zoom = block_rectangles_in_window(train_blocks, block_px, r0, r1, c0, c1)
-    val_rects_zoom = block_rectangles_in_window(val_blocks, block_px, r0, r1, c0, c1)
-    test_rects_zoom = block_rectangles_in_window(test_blocks, block_px, r0, r1, c0, c1)
-
-    def block_ids_to_full_rects(block_ids: np.ndarray) -> List[Tuple[int, int, int, int]]:
-        return [
-            (
-                int(br * block_px),
-                int(br * block_px + block_px),
-                int(bc * block_px),
-                int(bc * block_px + block_px),
-            )
-            for br, bc in block_ids
-        ]
-
-    train_rects_full = block_ids_to_full_rects(train_blocks)
-    val_rects_full = block_ids_to_full_rects(val_blocks)
-    test_rects_full = block_ids_to_full_rects(test_blocks)
+    train_rects_zoom = block_rectangles_in_window(selected_info["blocks"]["train"], block_px, r0, r1, c0, c1)
+    val_rects_zoom = block_rectangles_in_window(selected_info["blocks"]["val"], block_px, r0, r1, c0, c1)
+    test_rects_zoom = block_rectangles_in_window(selected_info["blocks"]["test"], block_px, r0, r1, c0, c1)
 
     bg = None
     bg_extent = zoom_extent
     if background_path:
-        bg, bg_transform, _ = read_gray_background(
-            background_path,
-            r0,
-            r1,
-            c0,
-            c1,
-            args.max_bg_size,
-        )
+        bg, bg_transform, _ = read_gray_background_by_bounds(background_path, zoom_extent, args.max_bg_size)
         bg_extent = extent_from_window_shape_transform(bg.shape[0], bg.shape[1], bg_transform)
 
-    aoi_extent = pixel_rect_to_map_extent(r0, r1, c0, c1, full_transform)
+    aoi_extent = pixel_rect_to_map_extent(r0, r1, c0, c1, selected_info["transform"])
     aoi_xmin, aoi_xmax, aoi_ymin, aoi_ymax = aoi_extent
 
-    train_sample_count = int(rowcol_train.shape[0])
-    val_sample_count = int(rowcol_val.shape[0])
-    test_sample_count = int(rowcol_test.shape[0])
+    train_sample_count = int(sample_counts["train"])
+    val_sample_count = int(sample_counts["val"])
+    test_sample_count = int(sample_counts["test"])
 
-    train_block_count = int(train_blocks.shape[0])
-    val_block_count = int(val_blocks.shape[0])
-    test_block_count = int(test_blocks.shape[0])
+    train_block_count = int(sum(info["blocks"]["train"].shape[0] for info in block_infos))
+    val_block_count = int(sum(info["blocks"]["val"].shape[0] for info in block_infos))
+    test_block_count = int(sum(info["blocks"]["test"].shape[0] for info in block_infos))
 
     fig = plt.figure(figsize=(16, 10))
     gs = fig.add_gridspec(
@@ -620,9 +767,10 @@ def main() -> None:
     ax_bottom = fig.add_subplot(gs[1, :])
 
     ax_full.set_facecolor("#d9d9d9")
-    add_block_patches(ax_full, train_rects_full, "green", full_transform, alpha=0.5, linewidth=0.35)
-    add_block_patches(ax_full, val_rects_full, "yellow", full_transform, alpha=0.5, linewidth=0.35)
-    add_block_patches(ax_full, test_rects_full, "blue", full_transform, alpha=0.5, linewidth=0.35)
+    for info in block_infos:
+        add_block_patches(ax_full, block_ids_to_rects(info["blocks"]["train"], block_px), "green", info["transform"], alpha=0.5, linewidth=0.35)
+        add_block_patches(ax_full, block_ids_to_rects(info["blocks"]["val"], block_px), "yellow", info["transform"], alpha=0.5, linewidth=0.35)
+        add_block_patches(ax_full, block_ids_to_rects(info["blocks"]["test"], block_px), "blue", info["transform"], alpha=0.5, linewidth=0.35)
 
     aoi_patch = Rectangle(
         (aoi_xmin, aoi_ymin),
@@ -669,9 +817,9 @@ def main() -> None:
             )
         )
 
-    add_block_patches(ax_zoom, train_rects_zoom, "green", full_transform, alpha=0.5, linewidth=0.55)
-    add_block_patches(ax_zoom, val_rects_zoom, "yellow", full_transform, alpha=0.5, linewidth=0.55)
-    add_block_patches(ax_zoom, test_rects_zoom, "blue", full_transform, alpha=0.5, linewidth=0.55)
+    add_block_patches(ax_zoom, train_rects_zoom, "green", selected_info["transform"], alpha=0.5, linewidth=0.55)
+    add_block_patches(ax_zoom, val_rects_zoom, "yellow", selected_info["transform"], alpha=0.5, linewidth=0.55)
+    add_block_patches(ax_zoom, test_rects_zoom, "blue", selected_info["transform"], alpha=0.5, linewidth=0.55)
 
     ax_zoom.set_xlim(zoom_extent[0], zoom_extent[1])
     ax_zoom.set_ylim(zoom_extent[2], zoom_extent[3])
@@ -765,7 +913,7 @@ def main() -> None:
     plt.close(fig)
 
     print(f"Saved figure: {outfig_path}")
-    print(f"Random AOI block: {selected_block}")
+    print(f"Random AOI block: ({selected_upazila}, {selected_br}, {selected_bc})")
     print(
         f"Train blocks: {train_block_count:,} | "
         f"Val blocks: {val_block_count:,} | "
