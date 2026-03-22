@@ -709,10 +709,7 @@ def main() -> None:
     block_infos, full_crs = reconstruct_split_blocks(meta)
 
     block_px = int(meta["block_px"])
-    background_path = resolve_path(args.background) if args.background else None
-    if background_path is None and meta.get("ae_path"):
-        candidate_bg = resolve_path(str(meta["ae_path"]))
-        background_path = candidate_bg if candidate_bg.exists() else None
+    background_path = None
 
     selected_upazila, selected_br, selected_bc = choose_random_block(block_infos, rng)
     selected_info = next(info for info in block_infos if info["upazila"] == selected_upazila)
@@ -737,9 +734,6 @@ def main() -> None:
 
     bg = None
     bg_extent = zoom_extent
-    if background_path:
-        bg, bg_transform, _ = read_gray_background_by_bounds(background_path, zoom_extent, args.max_bg_size)
-        bg_extent = extent_from_window_shape_transform(bg.shape[0], bg.shape[1], bg_transform)
 
     aoi_extent = pixel_rect_to_map_extent(r0, r1, c0, c1, selected_info["transform"])
     aoi_xmin, aoi_xmax, aoi_ymin, aoi_ymax = aoi_extent
@@ -795,27 +789,17 @@ def main() -> None:
         ax_full.grid(True, linestyle="--", linewidth=0.4, alpha=0.30)
     plt.setp(ax_full.get_xticklabels(), rotation=25, ha="right")
 
-    if bg is not None:
-        ax_zoom.imshow(
-            bg,
-            cmap="gray",
-            extent=bg_extent,
-            origin="upper",
-            interpolation="nearest",
+    ax_zoom.set_facecolor("#d9d9d9")
+    ax_zoom.add_patch(
+        Rectangle(
+            (zoom_extent[0], zoom_extent[2]),
+            zoom_extent[1] - zoom_extent[0],
+            zoom_extent[3] - zoom_extent[2],
+            facecolor="#d9d9d9",
+            edgecolor="none",
             zorder=0,
         )
-    else:
-        ax_zoom.set_facecolor("#d9d9d9")
-        ax_zoom.add_patch(
-            Rectangle(
-                (zoom_extent[0], zoom_extent[2]),
-                zoom_extent[1] - zoom_extent[0],
-                zoom_extent[3] - zoom_extent[2],
-                facecolor="#d9d9d9",
-                edgecolor="none",
-                zorder=0,
-            )
-        )
+    )
 
     add_block_patches(ax_zoom, train_rects_zoom, "green", selected_info["transform"], alpha=0.5, linewidth=0.55)
     add_block_patches(ax_zoom, val_rects_zoom, "yellow", selected_info["transform"], alpha=0.5, linewidth=0.55)
@@ -827,11 +811,10 @@ def main() -> None:
     apply_lonlat_dm_formatters(ax_zoom, full_crs, zoom_extent)
     ax_zoom.set_title("(b) Zoomed AOI with split blocks", fontsize=13, pad=8)
     ax_zoom.set_xlabel("Longitude")
-    ax_zoom.set_ylabel("Latitude", rotation=90, labelpad=14)
-    ax_zoom.yaxis.set_label_coords(-0.20, 0.5)
     if not args.no_grid:
         ax_zoom.grid(True, linestyle="--", linewidth=0.4, alpha=0.30)
     plt.setp(ax_zoom.get_xticklabels(), rotation=25, ha="right")
+    plt.setp(ax_zoom.get_yticklabels(), rotation=90, va="center")
 
     add_metric_scalebar(ax_full, full_extent, full_crs, length_m=args.scalebar_a_m, y_frac=0.055)
     add_metric_scalebar(ax_zoom, zoom_extent, full_crs, length_m=args.scalebar_b_m, y_frac=0.055)
