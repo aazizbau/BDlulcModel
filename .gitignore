@@ -50,6 +50,7 @@ assets/figures/*.png
 assets/figures/*.jpg
 assets/maps/*.png
 assets/maps/*.jpg
+*.svg
 *.tif
 *.tiff
 *.zip
