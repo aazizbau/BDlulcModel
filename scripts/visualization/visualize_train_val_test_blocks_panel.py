@@ -782,7 +782,7 @@ def main() -> None:
     ax_full.set_ylim(full_extent[2], full_extent[3])
     set_geographic_aspect(ax_full, full_extent, full_crs)
     apply_lonlat_dm_formatters(ax_full, full_crs, full_extent)
-    ax_full.set_title("(a) Full study area with sampled AOI", fontsize=13, pad=14)
+    ax_full.set_title("(a) Training data area with split blocks", fontsize=13, pad=14)
     ax_full.set_xlabel("Longitude")
     ax_full.set_ylabel("Latitude")
     if not args.no_grid:
@@ -809,7 +809,7 @@ def main() -> None:
     ax_zoom.set_ylim(zoom_extent[2], zoom_extent[3])
     set_geographic_aspect(ax_zoom, zoom_extent, full_crs)
     apply_lonlat_dm_formatters(ax_zoom, full_crs, zoom_extent)
-    ax_zoom.set_title("(b) Zoomed AOI with split blocks", fontsize=13, pad=8)
+    ax_zoom.set_title("(b) Zoomed split blocks", fontsize=13, pad=8)
     ax_zoom.set_xlabel("Longitude")
     if not args.no_grid:
         ax_zoom.grid(True, linestyle="--", linewidth=0.4, alpha=0.30)
