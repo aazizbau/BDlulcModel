@@ -24,3 +24,5 @@ fsspec>=2023.10.0
 requests>=2.31.0
 tqdm>=4.65.0
 psutil
+cairosvg
+Pillow
