@@ -26,7 +26,7 @@ python scripts/visualization/visualize_train_val_test_blocks_panel.py \
     --npz data/processed/training/ae64_samples_4upazila_2023_trainvaltest.npz \
     --outfig outputs/figures/train_val_test_blocks_panel.png \
     --north-arrow assets/maps/NorthArrow.svg \
-    --seed 42 \
+    --seed 36 \
     --context-blocks 1 \
     --dpi 300 \
     --add-main-title
@@ -69,6 +69,9 @@ except Exception:
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STUDY_AREA_GPKG = Path("assets/maps/bd_coastal_map_solid_gp.gpkg")
 STUDY_AREA_EDGE_COLOR = "#FA6200"
+PANEL_A_WIDTH_RATIO = 1.85
+PANEL_B_WIDTH_RATIO = 0.70
+TOP_PANEL_WSPACE = 0.00
 
 
 def resolve_path(path_str: str) -> Path:
@@ -810,9 +813,9 @@ def main() -> None:
         nrows=2,
         ncols=2,
         height_ratios=[1.0, 0.25],
-        width_ratios=[1.6, 0.95],
+        width_ratios=[PANEL_A_WIDTH_RATIO, PANEL_B_WIDTH_RATIO],
         hspace=0.16,
-        wspace=0.10,
+        wspace=TOP_PANEL_WSPACE,
     )
 
     ax_full = fig.add_subplot(gs[0, 0])
