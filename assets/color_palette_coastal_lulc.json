@@ -1,0 +1,24 @@
+{
+  "name": "coastal_lulc_palette",
+  "description": "Reusable project color palette for charts, graphs, maps, and figure styling.",
+  "colors": {
+    "mist_gray": "#B6B5B8",
+    "deep_slate": "#314245",
+    "teal_blue": "#3D848F",
+    "sand": "#FBEDD4",
+    "dust_rose": "#DBA796",
+    "coral": "#FF8973",
+    "ochre": "#BF9F74",
+    "olive": "#808F54"
+  },
+  "ordered_hex": [
+    "#B6B5B8",
+    "#314245",
+    "#3D848F",
+    "#FBEDD4",
+    "#DBA796",
+    "#FF8973",
+    "#BF9F74",
+    "#808F54"
+  ]
+}
