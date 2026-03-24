@@ -51,6 +51,13 @@ from rasterio.transform import Affine
 from rasterio.windows import Window
 
 try:
+    import geopandas as gpd  # type: ignore
+
+    HAVE_GPD = True
+except Exception:
+    HAVE_GPD = False
+
+try:
     import cairosvg  # type: ignore
     from PIL import Image  # type: ignore
 
@@ -60,6 +67,8 @@ except Exception:
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+STUDY_AREA_GPKG = Path("assets/maps/bd_coastal_map_solid_gp.gpkg")
+STUDY_AREA_EDGE_COLOR = "#FA6200"
 
 
 def resolve_path(path_str: str) -> Path:
@@ -555,6 +564,52 @@ def add_block_patches(
         ax.add_patch(patch)
 
 
+def add_study_area_outline(ax, full_crs: CRS) -> None:
+    if not HAVE_GPD:
+        return
+
+    gpkg_path = resolve_path(str(STUDY_AREA_GPKG))
+    if not gpkg_path.exists():
+        return
+
+    try:
+        gdf = gpd.read_file(gpkg_path)
+        if gdf.empty:
+            return
+        if gdf.crs is not None and CRS.from_user_input(gdf.crs) != full_crs:
+            gdf = gdf.to_crs(full_crs)
+        gdf.plot(
+            ax=ax,
+            facecolor="none",
+            edgecolor=STUDY_AREA_EDGE_COLOR,
+            linewidth=1.4,
+            zorder=7,
+        )
+    except Exception as exc:
+        print(f"Warning: could not draw study area outline from {gpkg_path}: {exc}")
+
+
+def get_study_area_extent(full_crs: CRS) -> Tuple[float, float, float, float] | None:
+    if not HAVE_GPD:
+        return None
+
+    gpkg_path = resolve_path(str(STUDY_AREA_GPKG))
+    if not gpkg_path.exists():
+        return None
+
+    try:
+        gdf = gpd.read_file(gpkg_path)
+        if gdf.empty:
+            return None
+        if gdf.crs is not None and CRS.from_user_input(gdf.crs) != full_crs:
+            gdf = gdf.to_crs(full_crs)
+        xmin, ymin, xmax, ymax = gdf.total_bounds
+        return float(xmin), float(xmax), float(ymin), float(ymax)
+    except Exception as exc:
+        print(f"Warning: could not read study area extent from {gpkg_path}: {exc}")
+        return None
+
+
 def add_zoom_connectors(
     fig,
     ax_full,
@@ -727,6 +782,9 @@ def main() -> None:
     zoom_transform = window_transform_from_meta(selected_info["transform"], r0, c0)
     zoom_extent = extent_from_window_shape_transform(zoom_h, zoom_w, zoom_transform)
     full_extent = union_extent([info["extent"] for info in block_infos])
+    study_area_extent = get_study_area_extent(full_crs)
+    if study_area_extent is not None:
+        full_extent = union_extent([full_extent, study_area_extent])
 
     train_rects_zoom = block_rectangles_in_window(selected_info["blocks"]["train"], block_px, r0, r1, c0, c1)
     val_rects_zoom = block_rectangles_in_window(selected_info["blocks"]["val"], block_px, r0, r1, c0, c1)
@@ -745,6 +803,7 @@ def main() -> None:
     train_block_count = int(sum(info["blocks"]["train"].shape[0] for info in block_infos))
     val_block_count = int(sum(info["blocks"]["val"].shape[0] for info in block_infos))
     test_block_count = int(sum(info["blocks"]["test"].shape[0] for info in block_infos))
+    pixels_per_block = int(block_px * block_px)
 
     fig = plt.figure(figsize=(16, 10))
     gs = fig.add_gridspec(
@@ -765,6 +824,7 @@ def main() -> None:
         add_block_patches(ax_full, block_ids_to_rects(info["blocks"]["train"], block_px), "green", info["transform"], alpha=0.5, linewidth=0.35)
         add_block_patches(ax_full, block_ids_to_rects(info["blocks"]["val"], block_px), "yellow", info["transform"], alpha=0.5, linewidth=0.35)
         add_block_patches(ax_full, block_ids_to_rects(info["blocks"]["test"], block_px), "blue", info["transform"], alpha=0.5, linewidth=0.35)
+    add_study_area_outline(ax_full, full_crs)
 
     aoi_patch = Rectangle(
         (aoi_xmin, aoi_ymin),
@@ -867,10 +927,14 @@ def main() -> None:
         f"Validation: {val_sample_count:,}    "
         f"Test: {test_sample_count:,}"
     )
+    block_info_text = (
+        f"Block size — {block_px} × {block_px} px    "
+        f"Pixels per block: {pixels_per_block:,}"
+    )
 
     ax_bottom.text(
         0.5,
-        0.30,
+        0.34,
         blocks_text,
         transform=ax_bottom.transAxes,
         fontsize=12,
@@ -879,8 +943,17 @@ def main() -> None:
     )
     ax_bottom.text(
         0.5,
-        0.10,
+        0.14,
         samples_text,
+        transform=ax_bottom.transAxes,
+        fontsize=12,
+        va="center",
+        ha="center",
+    )
+    ax_bottom.text(
+        0.5,
+        -0.06,
+        block_info_text,
         transform=ax_bottom.transAxes,
         fontsize=12,
         va="center",
@@ -907,6 +980,7 @@ def main() -> None:
         f"Val samples: {val_sample_count:,} | "
         f"Test samples: {test_sample_count:,}"
     )
+    print(f"Block size: {block_px} x {block_px} px | Pixels per block: {pixels_per_block:,}")
 
 
 if __name__ == "__main__":
