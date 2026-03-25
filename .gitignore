@@ -44,6 +44,7 @@ data/external/
 outputs/
 logs/
 runs/
+assets/
 !logs/.gitkeep
 experiments/
 !experiments/.gitkeep
