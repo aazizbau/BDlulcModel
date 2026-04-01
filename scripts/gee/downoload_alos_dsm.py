@@ -13,11 +13,13 @@ This is a Digital Surface Model (DSM), not a bare-earth DEM.
 Usage
 -----
 python scripts/gee/downoload_alos_dsm.py \
+    --project ee-project-id \
     --aoi configs/bd_coastal_aoi.yaml \
     --output data/raw/dem/bd_coastal_aw3d30_v41_dsm.tif
 
 Optional examples:
 python scripts/gee/downoload_alos_dsm.py \
+    --project ee-project-id \
     --aoi configs/bd_coastal_aoi.yaml \
     --output data/raw/dem/bd_coastal_aw3d30_v41_dsm.tif \
     --scale 30 \
@@ -242,10 +244,10 @@ def main() -> int:
     output_base.parent.mkdir(parents=True, exist_ok=True)
 
     aoi = load_aoi(aoi_path)
-    region = build_aoi(aoi)
 
     init_ee(args.project)
 
+    region = build_aoi(aoi)
     image = build_image(region)
     tiles = list(iterate_tiles(aoi, args.tile_deg))
 
