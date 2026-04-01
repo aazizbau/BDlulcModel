@@ -36,6 +36,7 @@ or let the script attempt interactive authentication.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -212,7 +213,7 @@ def download_image(
     params = {
         "name": output_path.stem,
         "bands": [BAND_NAME],
-        "region": region.toGeoJSONString(),
+        "region": json.dumps(region.getInfo()),
         "scale": scale,
         "crs": crs,
         "format": "GEO_TIFF",
