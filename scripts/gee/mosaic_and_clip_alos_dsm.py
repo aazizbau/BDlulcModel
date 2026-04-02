@@ -10,6 +10,13 @@ Inputs
 Output
 ------
 - data/processed/dsm/bd_coastal_aw3d30_v41_dsm_clipped.tif
+
+Example
+-------
+python scripts/gee/mosaic_and_clip_alos_dsm.py \
+    --input data/raw/dem \
+    --clip-vector assets/maps/bd_coastal_map_solid_gp.gpkg \
+    --output data/processed/dsm/bd_coastal_aw3d30_v41_dsm_clipped.tif
 """
 
 from __future__ import annotations
