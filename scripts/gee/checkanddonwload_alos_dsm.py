@@ -163,7 +163,7 @@ def aoi_bounds(aoi: AOI) -> Tuple[float, float, float, float]:
     return min(lons), min(lats), max(lons), max(lats)
 
 
-def iterate_tiles(aoi: AOI, tile_deg: float) -> Iterator[Tuple[int, int, ee.Geometry]]:
+def iterate_tiles(aoi: AOI, tile_deg: float) -> Iterator[Tuple[int, int, Tuple[float, float, float, float]]]:
     min_lon, min_lat, max_lon, max_lat = aoi_bounds(aoi)
 
     row = 0
@@ -174,11 +174,7 @@ def iterate_tiles(aoi: AOI, tile_deg: float) -> Iterator[Tuple[int, int, ee.Geom
         lon_start = min_lon
         while lon_start < max_lon:
             lon_end = min(lon_start + tile_deg, max_lon)
-            yield row, col, ee.Geometry.Rectangle(
-                [lon_start, lat_start, lon_end, lat_end],
-                proj="EPSG:4326",
-                geodesic=False,
-            )
+            yield row, col, (lon_start, lat_start, lon_end, lat_end)
             lon_start += tile_deg
             col += 1
         lat_start += tile_deg
@@ -190,6 +186,15 @@ def tile_output_path(output_base: Path, row: int, col: int) -> Path:
     stem = output_base.stem if output_base.suffix else output_base.name
     parent = output_base.parent if output_base.suffix else output_base
     return parent / f"{stem}_r{row:03d}_c{col:03d}{suffix}"
+
+
+def make_tile_geometry(bounds: Tuple[float, float, float, float]) -> ee.Geometry:
+    lon_start, lat_start, lon_end, lat_end = bounds
+    return ee.Geometry.Rectangle(
+        [lon_start, lat_start, lon_end, lat_end],
+        proj="EPSG:4326",
+        geodesic=False,
+    )
 
 
 def is_missing_tile(path: Path) -> bool:
@@ -242,10 +247,10 @@ def main() -> int:
     tiles = list(iterate_tiles(aoi, args.tile_deg))
 
     missing_tiles = []
-    for row, col, tile_region in tiles:
+    for row, col, tile_bounds in tiles:
         tile_path = tile_output_path(output_base, row, col)
         if is_missing_tile(tile_path):
-            missing_tiles.append((row, col, tile_region, tile_path))
+            missing_tiles.append((row, col, tile_bounds, tile_path))
 
     log(f"AOI config: {aoi_path}")
     log(f"AOI name: {aoi.name}")
@@ -274,7 +279,8 @@ def main() -> int:
     image = build_image(region)
 
     try:
-        for idx, (row, col, tile_region, tile_path) in enumerate(missing_tiles, start=1):
+        for idx, (row, col, tile_bounds, tile_path) in enumerate(missing_tiles, start=1):
+            tile_region = make_tile_geometry(tile_bounds)
             log(f"[{idx}/{len(missing_tiles)}] Downloading missing tile r{row:03d} c{col:03d}")
             download_image(
                 image=image.clip(tile_region),
