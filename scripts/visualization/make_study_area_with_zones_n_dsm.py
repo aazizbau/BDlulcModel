@@ -40,6 +40,7 @@ import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
+from rasterio.windows import Window
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.patches import Rectangle
 from matplotlib.ticker import FuncFormatter
@@ -64,6 +65,8 @@ DEFAULT_OUTPUT = Path("outputs/figures/study_area_with_zones_n_dsm.png")
 
 FIGSIZE = (11, 9)
 FIG_DPI = 300
+MAX_DISPLAY_SIZE = 2800
+DISPLAY_CHUNK_SIZE = 512
 
 ZONE_LABELS = {
     "western": "Western Zone",
@@ -186,6 +189,44 @@ def blend_relief(color_rgb: np.ndarray, hillshade: np.ndarray, alpha=0.38) -> np
     return np.clip(out, 0, 1)
 
 
+def read_downsampled_raster_windowed(
+    ds: rasterio.io.DatasetReader,
+    max_size: int,
+    chunk_size: int,
+) -> np.ndarray:
+    src_h = ds.height
+    src_w = ds.width
+
+    scale = max(src_h / max_size, src_w / max_size, 1.0)
+    dst_h = max(1, int(round(src_h / scale)))
+    dst_w = max(1, int(round(src_w / scale)))
+
+    out = np.empty((dst_h, dst_w), dtype=np.float32)
+
+    for row0 in range(0, dst_h, chunk_size):
+        row1 = min(row0 + chunk_size, dst_h)
+        for col0 in range(0, dst_w, chunk_size):
+            col1 = min(col0 + chunk_size, dst_w)
+
+            src_row0 = int(round(row0 * src_h / dst_h))
+            src_row1 = int(round(row1 * src_h / dst_h))
+            src_col0 = int(round(col0 * src_w / dst_w))
+            src_col1 = int(round(col1 * src_w / dst_w))
+
+            src_row1 = max(src_row0 + 1, min(src_row1, src_h))
+            src_col1 = max(src_col0 + 1, min(src_col1, src_w))
+
+            data = ds.read(
+                1,
+                window=Window(src_col0, src_row0, src_col1 - src_col0, src_row1 - src_row0),
+                out_shape=(row1 - row0, col1 - col0),
+                resampling=rasterio.enums.Resampling.bilinear,
+            ).astype(np.float32)
+            out[row0:row1, col0:col1] = data
+
+    return out
+
+
 def main() -> None:
     args = parse_args()
     zone_map = resolve_path(args.zone_map)
@@ -223,9 +264,13 @@ def main() -> None:
             raise ValueError("DSM raster has no CRS.")
         if ds.crs.to_string() != TARGET_CRS:
             raise ValueError(f"DSM raster CRS must be {TARGET_CRS}, found {ds.crs}.")
-        dsm = ds.read(1).astype(np.float32)
         bounds = ds.bounds
         nodata = ds.nodata
+        dsm = read_downsampled_raster_windowed(
+            ds,
+            max_size=MAX_DISPLAY_SIZE,
+            chunk_size=DISPLAY_CHUNK_SIZE,
+        )
 
     if nodata is not None:
         dsm[dsm == nodata] = np.nan
