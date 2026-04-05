@@ -40,10 +40,11 @@ import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
+from matplotlib.cm import ScalarMappable
 from rasterio.windows import Window
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.patches import Rectangle
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FuncFormatter, MaxNLocator
 from PIL import Image
 
 try:
@@ -67,6 +68,12 @@ FIGSIZE = (11, 9)
 FIG_DPI = 300
 MAX_DISPLAY_SIZE = 2800
 DISPLAY_CHUNK_SIZE = 512
+MAP_TITLE = "Bangladesh Coastal Zones and DSM"
+X_AXIS_LABEL = "Longitude"
+Y_AXIS_LABEL = "Latitude"
+COLORBAR_LABEL = "DSM height (m)"
+LONGITUDE_LABEL_PAD = 0
+TIGHT_LAYOUT_BOTTOM = -0.05
 
 ZONE_LABELS = {
     "western": "Western Zone",
@@ -103,11 +110,33 @@ def degree_formatter_lat(x, pos=None):
     return f"{abs(int(round(x)))}°{hemi}"
 
 
-def add_graticule(ax, xticks, yticks, color: str) -> None:
-    ax.set_xticks(xticks)
-    ax.set_yticks(yticks)
-    ax.xaxis.set_major_formatter(FuncFormatter(degree_formatter_lon))
-    ax.yaxis.set_major_formatter(FuncFormatter(degree_formatter_lat))
+def dm_formatter_lon(x, pos=None):
+    hemi = "E" if x >= 0 else "W"
+    deg = abs(x)
+    d = int(deg)
+    m = int(round((deg - d) * 60))
+    if m == 60:
+        d += 1
+        m = 0
+    return f"{d}°{m:02d}′{hemi}"
+
+
+def dm_formatter_lat(x, pos=None):
+    hemi = "N" if x >= 0 else "S"
+    deg = abs(x)
+    d = int(deg)
+    m = int(round((deg - d) * 60))
+    if m == 60:
+        d += 1
+        m = 0
+    return f"{d}°{m:02d}′{hemi}"
+
+
+def add_graticule(ax, color: str) -> None:
+    ax.xaxis.set_major_formatter(FuncFormatter(dm_formatter_lon))
+    ax.yaxis.set_major_formatter(FuncFormatter(dm_formatter_lat))
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=5))
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=6))
     ax.grid(True, color=color, linestyle="--", linewidth=0.6, alpha=0.30, zorder=0)
     ax.tick_params(axis="both", labelsize=10, direction="out", top=True, right=True, labeltop=False, labelright=False)
     for label in ax.get_yticklabels():
@@ -170,6 +199,12 @@ def add_north_arrow(ax, svg_path: Path, xy=(0.92, 0.90), zoom=0.23):
     ax.add_artist(ab)
 
 
+def set_geographic_aspect(ax, bounds) -> None:
+    mean_lat = 0.5 * (bounds.bottom + bounds.top)
+    cosv = np.cos(np.deg2rad(mean_lat))
+    ax.set_aspect("equal" if abs(cosv) < 1e-8 else 1.0 / cosv)
+
+
 def hillshade_from_array(arr: np.ndarray, azimuth=315.0, altitude=45.0) -> np.ndarray:
     x, y = np.gradient(arr.astype(np.float32))
     slope = np.pi / 2.0 - np.arctan(np.sqrt(x * x + y * y))
@@ -187,6 +222,30 @@ def blend_relief(color_rgb: np.ndarray, hillshade: np.ndarray, alpha=0.38) -> np
     hill_rgb = np.dstack([hillshade, hillshade, hillshade])
     out = (1.0 - alpha) * color_rgb + alpha * hill_rgb
     return np.clip(out, 0, 1)
+
+
+def valid_data_extent_from_preview(
+    valid_mask: np.ndarray,
+    bounds,
+) -> tuple[float, float, float, float]:
+    rows, cols = np.where(valid_mask)
+    if rows.size == 0 or cols.size == 0:
+        return bounds.left, bounds.right, bounds.bottom, bounds.top
+
+    h, w = valid_mask.shape
+    row_min = int(rows.min())
+    row_max = int(rows.max()) + 1
+    col_min = int(cols.min())
+    col_max = int(cols.max()) + 1
+
+    xres = (bounds.right - bounds.left) / w
+    yres = (bounds.top - bounds.bottom) / h
+
+    xmin = bounds.left + col_min * xres
+    xmax = bounds.left + col_max * xres
+    ymax = bounds.top - row_min * yres
+    ymin = bounds.top - row_max * yres
+    return xmin, xmax, ymin, ymax
 
 
 def read_downsampled_raster_windowed(
@@ -352,30 +411,35 @@ def main() -> None:
     )
     bay_txt.set_path_effects([pe.Stroke(linewidth=4, foreground=fig_bg), pe.Normal()])
 
-    xpad = 0.03 * (bounds.right - bounds.left)
-    ypad = 0.03 * (bounds.top - bounds.bottom)
-    ax.set_xlim(bounds.left - xpad, bounds.right + xpad)
-    ax.set_ylim(bounds.bottom - ypad, bounds.top + ypad)
-    mean_lat = 0.5 * (bounds.bottom + bounds.top)
-    ax.set_aspect(1.0 / max(np.cos(np.deg2rad(mean_lat)), 1e-8))
+    set_geographic_aspect(ax, bounds)
 
-    add_graticule(
-        ax,
-        xticks=np.arange(math.floor(bounds.left), math.ceil(bounds.right) + 1, 1),
-        yticks=np.arange(math.floor(bounds.bottom), math.ceil(bounds.top) + 1, 1),
-        color=grid_color,
-    )
+    add_graticule(ax, color=grid_color)
+    ax.set_title(MAP_TITLE, fontsize=15, pad=12, color=zone_text_color, fontweight="bold")
+    ax.set_xlabel(X_AXIS_LABEL, fontsize=12, color=zone_text_color, labelpad=LONGITUDE_LABEL_PAD)
+    ax.set_ylabel(Y_AXIS_LABEL, fontsize=12, color=zone_text_color)
+    ax.tick_params(axis="both", colors=zone_text_color)
+    plt.setp(ax.get_xticklabels(), rotation=25, ha="right")
 
     add_north_arrow(ax, north_arrow, xy=(0.92, 0.90), zoom=0.23)
     add_scalebar_2step(ax, length_km=150, location=(0.37, 0.06), fontsize=10)
 
-    ax.set_xlabel("")
-    ax.set_ylabel("")
+    sm = ScalarMappable(
+        norm=mcolors.Normalize(vmin=lo, vmax=hi),
+        cmap=dsm_cmap,
+    )
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax, fraction=0.045, pad=0.03)
+    cbar.set_label(COLORBAR_LABEL, rotation=90, color=zone_text_color, fontsize=11)
+    cbar.ax.tick_params(labelsize=10, colors=zone_text_color)
+    cbar.outline.set_edgecolor(zone_edge)
+    cbar.outline.set_linewidth(0.9)
+
     for spine in ax.spines.values():
         spine.set_linewidth(1.0)
         spine.set_edgecolor(zone_edge)
 
     output.parent.mkdir(parents=True, exist_ok=True)
+    plt.tight_layout(rect=(0, TIGHT_LAYOUT_BOTTOM, 1, 1))
     plt.savefig(output, dpi=FIG_DPI, bbox_inches="tight", facecolor=fig_bg)
     plt.close(fig)
     print(f"Saved: {output}")
