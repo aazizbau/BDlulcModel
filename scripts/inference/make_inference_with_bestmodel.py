@@ -274,6 +274,7 @@ def make_output_profiles(ae_src: rasterio.DatasetReader, save_probability_stack:
             "tiled": True,
             "blockxsize": 512,
             "blockysize": 512,
+            "BIGTIFF": "IF_SAFER",
         }
     )
 
@@ -288,6 +289,7 @@ def make_output_profiles(ae_src: rasterio.DatasetReader, save_probability_stack:
             "tiled": True,
             "blockxsize": 512,
             "blockysize": 512,
+            "BIGTIFF": "IF_SAFER",
         }
     )
 
@@ -305,6 +307,7 @@ def make_output_profiles(ae_src: rasterio.DatasetReader, save_probability_stack:
                 "blockxsize": 512,
                 "blockysize": 512,
                 "interleave": "band",
+                "BIGTIFF": "IF_SAFER",
             }
         )
 
