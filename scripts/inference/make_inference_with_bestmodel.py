@@ -36,6 +36,15 @@ Default outputs for year 2017:
 - outputs/inference/2017/confidence_bin_summary_2017.csv
 - outputs/inference/2017/raster_inventory_2017.csv
 - outputs/inference/2017/locked_feature_order_2017.csv
+
+Example run:
+python scripts/inference/make_inference_with_bestmodel.py \
+  --year 2017
+
+python scripts/inference/make_inference_with_bestmodel.py \
+  --year 2024 \
+  --save-probability-stack # for optional probability stack
+
 """
 
 from __future__ import annotations
