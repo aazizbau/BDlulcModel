@@ -27,6 +27,11 @@ Outputs
 - outputs/inference/change_analysis/uncertainty_summary_overall.csv
 - outputs/inference/change_analysis/uncertainty_summary_by_zone.csv
 - outputs/inference/change_analysis/zone_lookup.csv
+
+Example run
+-----------
+python scripts/inference/make_change_lulc_analysis_2017vs2024.py
+
 """
 
 from __future__ import annotations
