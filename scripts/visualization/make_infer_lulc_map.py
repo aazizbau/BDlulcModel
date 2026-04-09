@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import io
 import json
-import math
 from pathlib import Path
 
 import geopandas as gpd
@@ -37,6 +36,7 @@ from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.patches import Patch, Rectangle
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 from PIL import Image
+from pyproj import CRS, Transformer
 from rasterio.windows import Window
 
 try:
@@ -61,6 +61,19 @@ DISPLAY_CHUNK_SIZE = 512
 LONGITUDE_LABEL_PAD = 0
 TIGHT_LAYOUT_BOTTOM = -0.04
 CLASS_NODATA = 0
+MAP_TITLE_TEMPLATE = "Bangladesh Coastal LULC {year}"
+BAY_LABEL_X_FRAC = 0.25
+BAY_LABEL_Y_FRAC = 0.25
+SCALEBAR_X_FRAC = 0.02
+SCALEBAR_Y_FRAC = 0.03
+LEGEND_X_FRAC = 0.42
+LEGEND_Y_FRAC = 0.085
+LEGEND_FONTSIZE = 10
+LEGEND_HANDLE_LENGTH = 1.9
+LEGEND_HANDLE_HEIGHT = 1.3
+LEGEND_LABEL_SPACING = 0.55
+LEGEND_BORDER_PAD = 0.75
+LEGEND_BOX_ALPHA = 0.97
 
 LULC_NAMES = {
     1: "Urban / Institutional Built-up",
@@ -76,7 +89,7 @@ LULC_NAMES = {
 }
 
 LULC_COLORS = {
-    1: "#474143",
+    1: "#E66A00",
     2: "#8FBF7A",
     3: "#9C7A5B",
     4: "#FFC636",
@@ -122,31 +135,34 @@ def load_palette(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
-def dm_formatter_lon(x, pos=None):
-    hemi = "E" if x >= 0 else "W"
-    deg = abs(x)
-    d = int(deg)
-    m = int(round((deg - d) * 60))
+def decimal_to_dm(value: float, kind: str) -> str:
+    hemi = "E" if kind == "lon" and value >= 0 else "W" if kind == "lon" else "N" if value >= 0 else "S"
+    deg_abs = abs(value)
+    d = int(deg_abs)
+    m = int(round((deg_abs - d) * 60))
     if m == 60:
         d += 1
         m = 0
     return f"{d}°{m:02d}′{hemi}"
 
 
-def dm_formatter_lat(y, pos=None):
-    hemi = "N" if y >= 0 else "S"
-    deg = abs(y)
-    d = int(deg)
-    m = int(round((deg - d) * 60))
-    if m == 60:
-        d += 1
-        m = 0
-    return f"{d}°{m:02d}′{hemi}"
+def add_graticule(ax, color: str, src_crs) -> None:
+    src_crs = CRS.from_user_input(src_crs)
+    dst_crs = CRS.from_epsg(4326)
+    transformer = Transformer.from_crs(src_crs, dst_crs, always_xy=True)
 
+    def fmt_x(x, _pos=None):
+        y_mid = 0.5 * sum(ax.get_ylim())
+        lon, _ = transformer.transform(x, y_mid)
+        return decimal_to_dm(lon, "lon")
 
-def add_graticule(ax, color: str) -> None:
-    ax.xaxis.set_major_formatter(FuncFormatter(dm_formatter_lon))
-    ax.yaxis.set_major_formatter(FuncFormatter(dm_formatter_lat))
+    def fmt_y(y, _pos=None):
+        x_mid = 0.5 * sum(ax.get_xlim())
+        _, lat = transformer.transform(x_mid, y)
+        return decimal_to_dm(lat, "lat")
+
+    ax.xaxis.set_major_formatter(FuncFormatter(fmt_x))
+    ax.yaxis.set_major_formatter(FuncFormatter(fmt_y))
     ax.xaxis.set_major_locator(MaxNLocator(nbins=5))
     ax.yaxis.set_major_locator(MaxNLocator(nbins=6))
     ax.grid(True, color=color, linestyle="--", linewidth=0.6, alpha=0.24, zorder=0)
@@ -157,27 +173,19 @@ def add_graticule(ax, color: str) -> None:
         label.set_ha("center")
 
 
-def km_to_lon_degrees(km: float, lat_deg: float) -> float:
-    cos_lat = math.cos(math.radians(lat_deg))
-    if abs(cos_lat) < 1e-8:
-        cos_lat = 1e-8
-    return km / (111.320 * cos_lat)
-
-
 def add_scalebar_2step(ax, length_km=150, location=(0.38, 0.06), fontsize=10):
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
     x0 = xlim[0] + location[0] * (xlim[1] - xlim[0])
     y0 = ylim[0] + location[1] * (ylim[1] - ylim[0])
-    mid_lat = 0.5 * (ylim[0] + ylim[1])
-    total_deg = km_to_lon_degrees(length_km, mid_lat)
-    step_deg = total_deg / 2.0
+    total_map_units = length_km * 1000.0
+    step_map_units = total_map_units / 2.0
     bar_h = 0.014 * (ylim[1] - ylim[0])
 
     for i, face in enumerate(["black", "white"]):
         rect = Rectangle(
-            (x0 + i * step_deg, y0),
-            step_deg,
+            (x0 + i * step_map_units, y0),
+            step_map_units,
             bar_h,
             facecolor=face,
             edgecolor="black",
@@ -188,8 +196,8 @@ def add_scalebar_2step(ax, length_km=150, location=(0.38, 0.06), fontsize=10):
 
     label_y = y0 + bar_h + 0.012 * (ylim[1] - ylim[0])
     ax.text(x0, label_y, "0", ha="center", va="bottom", fontsize=fontsize, zorder=11)
-    ax.text(x0 + step_deg, label_y, "75", ha="center", va="bottom", fontsize=fontsize, zorder=11)
-    ax.text(x0 + 2 * step_deg, label_y, "150 km", ha="center", va="bottom", fontsize=fontsize, zorder=11)
+    ax.text(x0 + step_map_units, label_y, "75", ha="center", va="bottom", fontsize=fontsize, zorder=11)
+    ax.text(x0 + 2 * step_map_units, label_y, "150 km", ha="center", va="bottom", fontsize=fontsize, zorder=11)
 
 
 def load_svg_as_image(svg_path: Path, target_height_px: int = 220):
@@ -284,7 +292,8 @@ def main() -> None:
     fig_bg = colors["sand"]
     sea_color = colors["mist_gray"]
     grid_color = colors["deep_slate"]
-    zone_edge = colors["deep_slate"]
+    zone_edge = "#2b2e07"# "#7e8a00" # "#8a5700"
+    main_text_color = colors["deep_slate"]
     zone_text_color = colors["coral"]
     bay_text_color = colors["teal_blue"]
     legend_face = "#FFF9EF"
@@ -342,10 +351,10 @@ def main() -> None:
         )
         txt.set_path_effects([pe.Stroke(linewidth=3, foreground=fig_bg), pe.Normal()])
 
-    xmid = 0.5 * (bounds.left + bounds.right)
-    bay_y = bounds.bottom + 0.18 * (bounds.top - bounds.bottom)
+    bay_x = bounds.left + BAY_LABEL_X_FRAC * (bounds.right - bounds.left)
+    bay_y = bounds.bottom + BAY_LABEL_Y_FRAC * (bounds.top - bounds.bottom)
     bay_txt = ax.text(
-        xmid,
+        bay_x,
         bay_y,
         "Bay of Bengal",
         fontsize=14,
@@ -357,34 +366,38 @@ def main() -> None:
     bay_txt.set_path_effects([pe.Stroke(linewidth=4, foreground=fig_bg), pe.Normal()])
 
     set_geographic_aspect(ax, bounds)
-    add_graticule(ax, color=grid_color)
+    add_graticule(ax, color=grid_color, src_crs=raster_crs)
 
-    title = f"Bangladesh Coastal LULC {args.year}"
-    ax.set_title(title, fontsize=15, pad=12, color=zone_edge, fontweight="bold")
-    ax.set_xlabel("Longitude", fontsize=12, color=zone_edge, labelpad=LONGITUDE_LABEL_PAD)
-    ax.set_ylabel("Latitude", fontsize=12, color=zone_edge)
-    ax.tick_params(axis="both", colors=zone_edge)
+    title = MAP_TITLE_TEMPLATE.format(year=args.year)
+    ax.set_title(title, fontsize=15, pad=12, color=main_text_color, fontweight="bold")
+    ax.set_xlabel("Longitude", fontsize=12, color=main_text_color, labelpad=LONGITUDE_LABEL_PAD)
+    ax.set_ylabel("Latitude", fontsize=12, color=main_text_color)
+    ax.tick_params(axis="both", colors=main_text_color)
     plt.setp(ax.get_xticklabels(), rotation=25, ha="right")
 
     add_north_arrow(ax, north_arrow, xy=(0.92, 0.90), zoom=0.23)
-    add_scalebar_2step(ax, length_km=150, location=(0.37, 0.06), fontsize=10)
+    add_scalebar_2step(ax, length_km=150, location=(SCALEBAR_X_FRAC, SCALEBAR_Y_FRAC), fontsize=10)
 
     legend = ax.legend(
         handles=legend_handles(),
         loc="lower left",
-        bbox_to_anchor=(0.02, 0.11),
-        fontsize=9,
+        bbox_to_anchor=(LEGEND_X_FRAC, LEGEND_Y_FRAC),
+        fontsize=LEGEND_FONTSIZE,
         frameon=True,
-        framealpha=0.96,
+        framealpha=LEGEND_BOX_ALPHA,
         facecolor=legend_face,
-        edgecolor=zone_edge,
+        edgecolor=main_text_color,
         ncol=1,
+        handlelength=LEGEND_HANDLE_LENGTH,
+        handleheight=LEGEND_HANDLE_HEIGHT,
+        labelspacing=LEGEND_LABEL_SPACING,
+        borderpad=LEGEND_BORDER_PAD,
     )
     legend.set_zorder(12)
 
     for spine in ax.spines.values():
         spine.set_linewidth(1.0)
-        spine.set_edgecolor(zone_edge)
+        spine.set_edgecolor(main_text_color)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     plt.tight_layout(rect=(0, TIGHT_LAYOUT_BOTTOM, 1, 1))
