@@ -43,7 +43,7 @@ import rasterio
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 from PIL import Image
-from pyproj import CRS, Transformer
+from pyproj import CRS, Geod, Transformer
 from rasterio.enums import Resampling
 from rasterio.vrt import WarpedVRT
 from rasterio.windows import Window, bounds as window_bounds
@@ -190,19 +190,54 @@ def add_north_arrow(fig: plt.Figure, bg_color: str, text_color: str) -> None:
     ax.text(0.5, 0.30, "↑", ha="center", va="center", fontsize=28, fontweight="bold", color=text_color)
 
 
-def add_figure_scalebar(fig: plt.Figure, extent: tuple[float, float, float, float], text_color: str, edge_color: str, bg_color: str) -> None:
-    ax = fig.add_axes([0.06, 0.008, 0.16, 0.075])
+def choose_nice_scalebar_km(max_length_km: float) -> float:
+    nice = np.array([0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 25, 50, 75, 100, 150, 200], dtype=float)
+    valid = nice[nice <= max_length_km]
+    if len(valid) == 0:
+        return float(max_length_km)
+    return float(valid[-1])
+
+
+def add_figure_scalebar(
+    fig: plt.Figure,
+    anchor_ax: plt.Axes,
+    extent: tuple[float, float, float, float],
+    crs: CRS,
+    text_color: str,
+    edge_color: str,
+    bg_color: str,
+) -> None:
+    xmin, xmax, ymin, ymax = extent
+    if "4326" in crs.to_string() or getattr(crs, "is_geographic", False):
+        geod = Geod(ellps="WGS84")
+        mid_lat = 0.5 * (ymin + ymax)
+        width_m = geod.inv(xmin, mid_lat, xmax, mid_lat)[2]
+    else:
+        width_m = xmax - xmin
+    if width_m <= 0:
+        return
+
+    length_km = choose_nice_scalebar_km((width_m / 1000.0) * 0.30)
+    bar_frac = (length_km * 1000.0) / width_m
+
+    bbox = anchor_ax.get_position()
+    scalebar_width = bbox.width * bar_frac
+    scalebar_left = bbox.x0 + bbox.width * 0.05
+    scalebar_bottom = 0.012
+    scalebar_height = 0.07
+
+    ax = fig.add_axes([scalebar_left, scalebar_bottom, scalebar_width, scalebar_height])
     ax.axis("off")
     ax.set_facecolor(bg_color)
     y0 = 0.38
-    x0 = 0.10
-    total_w = 0.72
+    x0 = 0.0
+    total_w = 1.0
     step_w = total_w / 2.0
     ax.add_patch(mpatches.Rectangle((x0, y0), step_w, 0.18, facecolor="black", edgecolor=edge_color, linewidth=1.0))
     ax.add_patch(mpatches.Rectangle((x0 + step_w, y0), step_w, 0.18, facecolor="white", edgecolor=edge_color, linewidth=1.0))
     ax.text(x0, y0 - 0.08, "0", ha="center", va="top", fontsize=13, color=text_color)
-    ax.text(x0 + step_w, y0 - 0.08, "75", ha="center", va="top", fontsize=13, color=text_color)
-    ax.text(x0 + total_w, y0 - 0.08, "150 km", ha="center", va="top", fontsize=13, color=text_color)
+    ax.text(x0 + step_w, y0 - 0.08, f"{length_km / 2:g}", ha="center", va="top", fontsize=13, color=text_color)
+    ax.text(x0 + total_w, y0 - 0.08, f"{length_km:g} km", ha="center", va="top", fontsize=13, color=text_color)
 
 
 def aligned_view(src: rasterio.DatasetReader, ref: rasterio.DatasetReader, resampling: Resampling) -> rasterio.DatasetReader:
@@ -480,6 +515,8 @@ def main() -> None:
             set_geographic_aspect(ax, extent, plot_crs)
             apply_lonlat_dm_formatters(ax, plot_crs, extent)
             ax.tick_params(axis="both", colors=colors["text"], labelsize=11)
+            if col_idx > 0:
+                ax.tick_params(axis="y", labelleft=False)
             for spine in ax.spines.values():
                 spine.set_color(colors["edge"])
                 spine.set_linewidth(1.0)
@@ -500,7 +537,7 @@ def main() -> None:
         ncol=5,
         frameon=True,
         framealpha=0.96,
-        bbox_to_anchor=(0.5, 0.02),
+        bbox_to_anchor=(0.5, -0.06),
         edgecolor=colors["edge"],
         facecolor=colors["panel_bg"],
         fontsize=11,
@@ -519,7 +556,8 @@ def main() -> None:
         )
 
     sample_extent = rows_payload[0]["extent"]
-    add_figure_scalebar(fig, sample_extent, colors["text"], colors["edge"], colors["panel_bg"])
+    sample_crs = rows_payload[0]["plot_crs"]
+    add_figure_scalebar(fig, axes[0][0], sample_extent, sample_crs, colors["text"], colors["edge"], colors["panel_bg"])
     add_north_arrow(fig, colors["panel_bg"], colors["text"])
     top_margin = 0.92 if args.add_main_title else 0.965
     fig.subplots_adjust(left=0.055, right=0.985, top=top_margin, bottom=0.14, wspace=0.08, hspace=0.30)
