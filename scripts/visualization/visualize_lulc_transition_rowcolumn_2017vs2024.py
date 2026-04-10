@@ -179,15 +179,15 @@ def load_svg_as_image(svg_path: Path, target_height_px: int = 220):
 
 
 def add_north_arrow(fig: plt.Figure, bg_color: str, text_color: str) -> None:
-    ax = fig.add_axes([0.88, 0.005, 0.08, 0.10])
+    ax = fig.add_axes([0.90, 0.01, 0.055, 0.075])
     ax.axis("off")
     ax.set_facecolor(bg_color)
-    img = load_svg_as_image(resolve_path(NORTH_ARROW_SVG), target_height_px=220)
+    img = load_svg_as_image(resolve_path(NORTH_ARROW_SVG), target_height_px=160)
     if img is not None:
         ax.imshow(np.asarray(img))
         return
-    ax.text(0.5, 0.78, "N", ha="center", va="center", fontsize=16, fontweight="bold", color=text_color)
-    ax.text(0.5, 0.30, "↑", ha="center", va="center", fontsize=28, fontweight="bold", color=text_color)
+    ax.text(0.5, 0.78, "N", ha="center", va="center", fontsize=13, fontweight="bold", color=text_color)
+    ax.text(0.5, 0.30, "↑", ha="center", va="center", fontsize=22, fontweight="bold", color=text_color)
 
 
 def choose_nice_scalebar_km(max_length_km: float) -> float:
