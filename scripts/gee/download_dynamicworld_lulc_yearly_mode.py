@@ -239,12 +239,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     aoi_path = resolve_path(args.aoi)
     aoi = load_aoi(aoi_path)
-    geometry = build_aoi(aoi)
 
     output = args.output or Path(f"data/raw/dynamicworld/bd_coastal_dynamicworld_{args.year}_mode.tif")
     output = resolve_path(output)
 
     initialize_earth_engine(project=args.project)
+    geometry = build_aoi(aoi)
     mode_image = build_yearly_mode_image(args.year, geometry)
 
     print(f"AOI config   : {aoi_path}")
