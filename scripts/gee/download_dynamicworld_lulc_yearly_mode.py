@@ -30,7 +30,7 @@ python scripts/gee/download_dynamicworld_lulc_yearly_mode.py \
     --output data/raw/dynamicworld/bd_coastal_dynamicworld_2017_mode.tif \
     --crs EPSG:4326 \
     --scale 10 \
-    --tile-deg 0.40
+    --tile-deg 0.25
 """
 
 from __future__ import annotations
@@ -224,7 +224,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--tile-deg",
         type=float,
-        default=0.40,
+        default=0.25,
         help="Tile size in degrees (default: 0.40).",
     )
     parser.add_argument(
