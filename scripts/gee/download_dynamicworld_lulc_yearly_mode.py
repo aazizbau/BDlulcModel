@@ -233,7 +233,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--tile-deg",
         type=float,
         default=0.25,
-        help="Tile size in degrees (default: 0.40).",
+        help="Tile size in degrees (default: 0.25).",
     )
     parser.add_argument(
         "--overwrite",
