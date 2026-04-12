@@ -55,6 +55,7 @@ from src.gee.aoi import AOI, load_aoi
 DATASET_ID = "GOOGLE/DYNAMICWORLD/V1"
 BAND_NAME = "label"
 GEE_PROJECT_ENV = "GEE_PROJECT_ID"
+DYNAMICWORLD_NODATA = -1
 
 
 def resolve_path(path: Path) -> Path:
@@ -97,7 +98,14 @@ def build_yearly_mode_image(year: int, geometry: ee.Geometry) -> ee.Image:
         raise RuntimeError(f"No Dynamic World images found for year {year}.")
 
     print(f"Found {size} Dynamic World images for {year}. Building yearly mode composite ...")
-    return collection.select(BAND_NAME).mode().rename(BAND_NAME).clip(geometry).toUint8()
+    return (
+        collection.select(BAND_NAME)
+        .mode()
+        .rename(BAND_NAME)
+        .clip(geometry)
+        .unmask(DYNAMICWORLD_NODATA)
+        .toInt16()
+    )
 
 
 def get_bounds_from_polygon(polygon: Sequence[Sequence[float]]) -> Tuple[float, float, float, float]:

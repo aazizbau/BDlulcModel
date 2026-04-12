@@ -42,6 +42,7 @@ TARGET_CRS = "EPSG:4326"
 DEFAULT_INPUT = Path("data/raw/dynamicworld")
 DEFAULT_CLIP_VECTOR = Path("assets/maps/bd_coastal_map_solid_gp.gpkg")
 DEFAULT_OUTPUT_DIR = Path("data/processed/dynamicworld")
+DYNAMICWORLD_NODATA = -1
 
 
 def ts() -> str:
@@ -129,7 +130,7 @@ def reproject_array_to_4326(array: np.ndarray, meta: dict) -> tuple[np.ndarray, 
 
     dst = np.full(
         (meta["count"], dst_height, dst_width),
-        meta.get("nodata", 255),
+        meta.get("nodata", DYNAMICWORLD_NODATA),
         dtype=array.dtype,
     )
 
@@ -194,8 +195,10 @@ def main() -> int:
                 "count": mosaic_arr.shape[0],
             }
         )
-        if mosaic_meta.get("nodata") is None:
-            mosaic_meta["nodata"] = 255
+        mosaic_meta["dtype"] = "int16"
+        mosaic_arr = mosaic_arr.astype(np.int16, copy=False)
+        if mosaic_meta.get("nodata") is None or float(mosaic_meta.get("nodata")) == 0.0:
+            mosaic_meta["nodata"] = DYNAMICWORLD_NODATA
     finally:
         for src in srcs:
             src.close()
@@ -230,12 +233,17 @@ def main() -> int:
             "count": clipped_arr.shape[0],
         }
     )
+    clipped_arr = clipped_arr.astype(np.int16, copy=False)
+    clipped_meta["dtype"] = "int16"
+    clipped_meta["nodata"] = DYNAMICWORLD_NODATA
 
     log(f"Ensuring output CRS is {TARGET_CRS} ...")
     final_arr, final_meta = reproject_array_to_4326(clipped_arr, clipped_meta)
     final_meta.update(
         {
             "driver": "GTiff",
+            "dtype": "int16",
+            "nodata": DYNAMICWORLD_NODATA,
             "compress": "DEFLATE",
             "tiled": True,
             "BIGTIFF": "IF_SAFER",
