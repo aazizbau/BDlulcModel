@@ -146,7 +146,11 @@ def get_bounds_from_polygon(polygon: Sequence[Sequence[float]]) -> Tuple[float, 
     return min(lons), min(lats), max(lons), max(lats)
 
 
-def iterate_tiles(polygon: Sequence[Sequence[float]], tile_deg: float) -> Iterator[Tuple[int, int, Tuple[float, float, float, float]]]:
+def iterate_tiles(
+    polygon: Sequence[Sequence[float]],
+    geometry: ee.Geometry,
+    tile_deg: float,
+) -> Iterator[Tuple[int, int, Tuple[float, float, float, float]]]:
     min_lon, min_lat, max_lon, max_lat = get_bounds_from_polygon(polygon)
     if tile_deg <= 0:
         raise ValueError("Tile size must be greater than zero.")
@@ -159,7 +163,15 @@ def iterate_tiles(polygon: Sequence[Sequence[float]], tile_deg: float) -> Iterat
         lon_start = min_lon
         while lon_start < max_lon:
             lon_end = min(lon_start + tile_deg, max_lon)
-            yield row, col, (lon_start, lat_start, lon_end, lat_end)
+            rect = ee.Geometry.Rectangle(
+                [lon_start, lat_start, lon_end, lat_end],
+                proj="EPSG:4326",
+                geodesic=False,
+            )
+            tile_region = rect.intersection(geometry, ee.ErrorMargin(1))
+            area = tile_region.area(maxError=1).getInfo()
+            if area and area > 0:
+                yield row, col, (lon_start, lat_start, lon_end, lat_end)
             lon_start += tile_deg
             col += 1
         lat_start += tile_deg
@@ -215,7 +227,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     output_base.parent.mkdir(parents=True, exist_ok=True)
 
     aoi = load_aoi(aoi_path)
-    tiles = list(iterate_tiles(aoi.bbox_polygon(), args.tile_deg))
+    initialize_earth_engine(project=args.project)
+    geometry = build_aoi(aoi)
+    tiles = list(iterate_tiles(aoi.bbox_polygon(), geometry, args.tile_deg))
 
     missing_tiles = []
     for row, col, tile_bounds in tiles:
@@ -246,8 +260,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         log("Dry run enabled. No downloads started.")
         return 0
 
-    initialize_earth_engine(project=args.project)
-    geometry = build_aoi(aoi)
     image = build_yearly_mode_image(args.year, geometry)
 
     try:
