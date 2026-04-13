@@ -329,6 +329,58 @@ def compute_stats(arr: np.ndarray, px_area_km2: float, focus_label: str) -> Dict
     return stats
 
 
+def init_stats_counter() -> dict[str, int]:
+    return {"unchanged": 0, "focus": 0, "other_change": 0, "nodata": 0}
+
+
+def compute_stats_from_counter(counter: dict[str, int], px_area_km2: float, focus_label: str) -> Dict[str, Dict[str, float]]:
+    total_valid = counter["unchanged"] + counter["focus"] + counter["other_change"]
+    class_map = {
+        "0": ("Unchanged", counter["unchanged"]),
+        "1": (focus_label, counter["focus"]),
+        "2": ("Other Change", counter["other_change"]),
+    }
+    stats: Dict[str, Dict[str, float]] = {}
+    for class_id, (label, count) in class_map.items():
+        stats[class_id] = {
+            "label": label,
+            "pixel_count": count,
+            "area_km2": count * px_area_km2,
+            "percent_of_valid_area": (count / total_valid * 100.0) if total_valid > 0 else 0.0,
+        }
+    return stats
+
+
+def update_focus_counters(
+    counters: dict[str, dict[str, int]],
+    from_class: np.ndarray,
+    to_class: np.ndarray,
+    nodata_mask: np.ndarray,
+) -> None:
+    stable = (from_class == to_class) & (~nodata_mask)
+    changed = (~stable) & (~nodata_mask)
+
+    focus_masks = {
+        "map1_urban_infrastructure_expansion": changed & np.isin(to_class, [1, 3]),
+        "map2_rural_settlement_expansion": changed & (to_class == 2),
+        "map3_productive_land_conversion": changed & ((to_class == 6) | (to_class == 5) | ((to_class == 4) & (from_class != 6))),
+        "map4_water_expansion_erosion": changed & ((to_class == 8) | ((to_class == 7) & (from_class != 8))),
+        "map5_ecological_recovery": changed & ((to_class == 9) | ((to_class == 5) & (from_class != 9))),
+        "map6_ecological_degradation": changed & ((from_class == 9) | ((from_class == 5) & (to_class != 9))),
+    }
+
+    unchanged_count = int(stable.sum())
+    nodata_count = int(nodata_mask.sum())
+    changed_count = int(changed.sum())
+
+    for key, focus_mask in focus_masks.items():
+        focus_count = int(focus_mask.sum())
+        counters[key]["unchanged"] += unchanged_count
+        counters[key]["focus"] += focus_count
+        counters[key]["other_change"] += changed_count - focus_count
+        counters[key]["nodata"] += nodata_count
+
+
 def choose_zone_field(gdf: gpd.GeoDataFrame) -> str:
     for col in ["zone", "Zone", "ZONE", "zone_name", "Zone_Name", "ZONE_NAME", "name", "Name", "NAME"]:
         if col in gdf.columns:
@@ -480,19 +532,21 @@ def main() -> None:
 
     log(f"Reading raster: {input_path}")
     with rasterio.open(input_path) as src:
-        arr = src.read(1)
         nodata = src.nodata if src.nodata is not None else 0
         transform = src.transform
         profile = src.profile
         bounds = src.bounds
         raster_crs = src.crs
+        px_area_km2 = pixel_area_km2(transform)
 
-    nodata_mask = arr == nodata
-    from_class, to_class = decode_transition(arr)
-    px_area_km2 = pixel_area_km2(transform)
-
-    log("Building six separate focus maps.")
-    maps = build_maps(from_class, to_class, nodata_mask)
+    log("Building six separate focus map statistics blockwise.")
+    stats_counters = {key: init_stats_counter() for key in MAP_SPECS}
+    with rasterio.open(input_path) as src:
+        for _, window in src.block_windows(1):
+            block = src.read(1, window=window)
+            nodata_mask = block == nodata
+            from_class, to_class = decode_transition(block)
+            update_focus_counters(stats_counters, from_class, to_class, nodata_mask)
 
     with rasterio.open(input_path) as src:
         preview = read_downsampled_raster_windowed(src, MAX_DISPLAY_SIZE, DISPLAY_CHUNK_SIZE)
@@ -520,8 +574,7 @@ def main() -> None:
         "outputs": {},
     }
 
-    for key, out_arr in maps.items():
-        spec = MAP_SPECS[key]
+    for key, spec in MAP_SPECS.items():
         png_path = outdir / f"lulc_transition_2017_vs_2024_{key}.png"
         json_path = outdir / f"lulc_transition_2017_vs_2024_{key}_stats.json"
         log(f"Rendering {key}: {png_path}")
@@ -545,7 +598,7 @@ def main() -> None:
             bay_text_color=bay_text_color,
             legend_face=legend_face,
         )
-        stats = compute_stats(out_arr, px_area_km2, spec["label"])
+        stats = compute_stats_from_counter(stats_counters[key], px_area_km2, spec["label"])
         json_path.write_text(json.dumps(stats, indent=2), encoding="utf-8")
         master_summary["outputs"][key] = {
             "png": str(png_path),
