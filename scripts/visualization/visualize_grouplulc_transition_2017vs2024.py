@@ -23,6 +23,7 @@ python scripts/visualization/visualize_grouplulc_transition_2017vs2024.py
 from __future__ import annotations
 
 import argparse
+import csv
 import io
 import json
 from datetime import datetime, timedelta, timezone
@@ -35,6 +36,7 @@ import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
+from rasterio.features import rasterize
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.patches import Patch, Rectangle
 from matplotlib.ticker import FuncFormatter, MaxNLocator
@@ -58,6 +60,8 @@ DEFAULT_NORTH_ARROW = Path("assets/maps/NorthArrow.svg")
 DEFAULT_PALETTE = Path("assets/color_palette_coastal_lulc.json")
 DEFAULT_OUTPUT = Path("outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive.png")
 DEFAULT_STATS = Path("outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive_stats.json")
+DEFAULT_TOTAL_CSV = Path("outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive_total.csv")
+DEFAULT_ZONEWISE_CSV = Path("outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive_zonewise.csv")
 
 FIGSIZE = (11, 9)
 FIG_DPI = 300
@@ -91,7 +95,7 @@ GROUP_INFO: Dict[int, Dict[str, str]] = {
     0: {"label": "Unchanged", "color": "#D9D9D9"},
     1: {"label": "Urban / Infrastructure Expansion", "color": "#D73027"},
     2: {"label": "Rural Settlement Expansion", "color": "#66A61E"},
-    3: {"label": "Productive Land Conversion", "color": "#F46D43"},
+    3: {"label": "Productive Land Conversion", "color": "#BF9F74"},
     4: {"label": "Water Expansion / Erosion", "color": "#2C7BB6"},
     5: {"label": "Ecological Recovery / Natural Vegetation Expansion", "color": "#1A9850"},
     6: {"label": "Ecological Degradation / Vegetation Loss", "color": "#7B3294"},
@@ -132,6 +136,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="Output PNG path.")
     parser.add_argument("--stats-json", type=Path, default=DEFAULT_STATS, help="Output JSON stats path.")
+    parser.add_argument("--total-csv", type=Path, default=DEFAULT_TOTAL_CSV, help="Output CSV path for total grouped analysis.")
+    parser.add_argument("--zonewise-csv", type=Path, default=DEFAULT_ZONEWISE_CSV, help="Output CSV path for zone-wise grouped analysis.")
     parser.add_argument("--title", default=MAP_TITLE, help="Map title.")
     return parser.parse_args()
 
@@ -290,6 +296,104 @@ def compute_group_stats(grouped: np.ndarray, px_area_km2: float) -> Dict[str, Di
     return stats
 
 
+def compute_group_rows(
+    grouped: np.ndarray,
+    px_area_km2: float,
+    scope_name: str,
+    zone_key: str,
+    zone_label: str,
+) -> list[dict[str, object]]:
+    valid = grouped != 255
+    changed = valid & (grouped != 0)
+    total_valid_pixels = int(valid.sum())
+    total_changed_pixels = int(changed.sum())
+    total_valid_area_km2 = total_valid_pixels * px_area_km2
+    total_changed_area_km2 = total_changed_pixels * px_area_km2
+
+    rows: list[dict[str, object]] = []
+    for gid in range(8):
+        pixel_count = int((grouped == gid).sum())
+        area_km2 = pixel_count * px_area_km2
+        percent_of_valid_area = (pixel_count / total_valid_pixels * 100.0) if total_valid_pixels > 0 else 0.0
+        if gid == 0:
+            percent_of_changed_area = 0.0
+        else:
+            percent_of_changed_area = (pixel_count / total_changed_pixels * 100.0) if total_changed_pixels > 0 else 0.0
+        rows.append(
+            {
+                "scope_name": scope_name,
+                "zone_key": zone_key,
+                "zone_label": zone_label,
+                "group_id": gid,
+                "group_label": GROUP_INFO[gid]["label"],
+                "group_color": GROUP_INFO[gid]["color"],
+                "is_changed_group": int(gid != 0),
+                "pixel_count": pixel_count,
+                "area_km2": area_km2,
+                "percent_of_valid_area": percent_of_valid_area,
+                "percent_of_changed_area": percent_of_changed_area,
+                "total_valid_pixels": total_valid_pixels,
+                "total_changed_pixels": total_changed_pixels,
+                "total_valid_area_km2": total_valid_area_km2,
+                "total_changed_area_km2": total_changed_area_km2,
+            }
+        )
+    return rows
+
+
+def choose_zone_field(gdf: gpd.GeoDataFrame) -> str:
+    for col in ["zone", "Zone", "ZONE", "zone_name", "Zone_Name", "ZONE_NAME", "name", "Name", "NAME"]:
+        if col in gdf.columns:
+            return col
+    raise ValueError(f"Could not find a zone name field in {list(gdf.columns)}")
+
+
+def build_zonewise_group_rows(
+    grouped: np.ndarray,
+    zones: gpd.GeoDataFrame,
+    zone_field: str,
+    transform,
+    shape: tuple[int, int],
+    px_area_km2: float,
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for zone_idx, (_, row) in enumerate(zones.iterrows(), start=1):
+        geom = row.geometry
+        if geom is None or geom.is_empty:
+            continue
+        zone_key = str(row[zone_field]).strip().lower()
+        zone_label = ZONE_LABELS.get(zone_key, str(row[zone_field]).strip())
+        zone_mask = rasterize(
+            [(geom, 1)],
+            out_shape=shape,
+            transform=transform,
+            fill=0,
+            dtype="uint8",
+            all_touched=False,
+        ).astype(bool, copy=False)
+        zone_grouped = np.where(zone_mask, grouped, 255).astype(np.uint8, copy=False)
+        rows.extend(
+            compute_group_rows(
+                zone_grouped,
+                px_area_km2=px_area_km2,
+                scope_name=f"zone_{zone_idx}",
+                zone_key=zone_key,
+                zone_label=zone_label,
+            )
+        )
+    return rows
+
+
+def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
+    if not rows:
+        raise ValueError(f"No rows to write for CSV: {path}")
+    fieldnames = list(rows[0].keys())
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def read_downsampled_raster_windowed(
     ds: rasterio.io.DatasetReader,
     max_size: int,
@@ -351,9 +455,13 @@ def main() -> None:
     palette_path = resolve_path(args.palette)
     output_path = resolve_path(args.output)
     stats_path = resolve_path(args.stats_json)
+    total_csv_path = resolve_path(args.total_csv)
+    zonewise_csv_path = resolve_path(args.zonewise_csv)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     stats_path.parent.mkdir(parents=True, exist_ok=True)
+    total_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    zonewise_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
     palette = load_palette(palette_path)
     colors = palette["colors"]
@@ -411,6 +519,23 @@ def main() -> None:
     if zones.crs is None:
         raise ValueError("Zone map has no CRS.")
     zones = zones.to_crs(raster_crs)
+    zone_field = choose_zone_field(zones)
+
+    total_csv_rows = compute_group_rows(
+        grouped,
+        px_area_km2=px_area_km2,
+        scope_name="total",
+        zone_key="total",
+        zone_label="Whole Study Area",
+    )
+    zonewise_csv_rows = build_zonewise_group_rows(
+        grouped,
+        zones=zones,
+        zone_field=zone_field,
+        transform=transform,
+        shape=grouped.shape,
+        px_area_km2=px_area_km2,
+    )
 
     fig, ax = plt.subplots(figsize=FIGSIZE, dpi=FIG_DPI, facecolor=fig_bg)
     ax.set_facecolor(sea_color)
@@ -503,6 +628,10 @@ def main() -> None:
 
     log(f"Writing stats: {stats_path}")
     stats_path.write_text(json.dumps(stats, indent=2), encoding="utf-8")
+    log(f"Writing total CSV: {total_csv_path}")
+    write_csv(total_csv_path, total_csv_rows)
+    log(f"Writing zone-wise CSV: {zonewise_csv_path}")
+    write_csv(zonewise_csv_path, zonewise_csv_rows)
     log("Done.")
 
 
