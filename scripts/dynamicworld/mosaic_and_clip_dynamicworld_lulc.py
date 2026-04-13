@@ -43,6 +43,7 @@ DEFAULT_INPUT = Path("data/raw/dynamicworld")
 DEFAULT_CLIP_VECTOR = Path("assets/maps/bd_coastal_map_solid_gp.gpkg")
 DEFAULT_OUTPUT_DIR = Path("data/processed/dynamicworld")
 DYNAMICWORLD_NODATA = -1
+INT16_MASK_FILL = np.int16(-32768)
 
 
 def ts() -> str:
@@ -159,6 +160,12 @@ def reproject_array_to_4326(array: np.ndarray, meta: dict) -> tuple[np.ndarray, 
     return dst, out_meta
 
 
+def normalize_dynamicworld_nodata(arr: np.ndarray) -> np.ndarray:
+    out = arr.astype(np.int16, copy=False)
+    out[out == INT16_MASK_FILL] = DYNAMICWORLD_NODATA
+    return out
+
+
 def main() -> int:
     args = parse_args()
     input_dir = resolve_path(args.input)
@@ -197,6 +204,7 @@ def main() -> int:
         )
         mosaic_meta["dtype"] = "int16"
         mosaic_arr = mosaic_arr.astype(np.int16, copy=False)
+        mosaic_arr = normalize_dynamicworld_nodata(mosaic_arr)
         if mosaic_meta.get("nodata") is None or float(mosaic_meta.get("nodata")) == 0.0:
             mosaic_meta["nodata"] = DYNAMICWORLD_NODATA
     finally:
@@ -234,11 +242,13 @@ def main() -> int:
         }
     )
     clipped_arr = clipped_arr.astype(np.int16, copy=False)
+    clipped_arr = normalize_dynamicworld_nodata(clipped_arr)
     clipped_meta["dtype"] = "int16"
     clipped_meta["nodata"] = DYNAMICWORLD_NODATA
 
     log(f"Ensuring output CRS is {TARGET_CRS} ...")
     final_arr, final_meta = reproject_array_to_4326(clipped_arr, clipped_meta)
+    final_arr = normalize_dynamicworld_nodata(final_arr)
     final_meta.update(
         {
             "driver": "GTiff",

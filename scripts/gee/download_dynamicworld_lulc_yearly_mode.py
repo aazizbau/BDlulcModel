@@ -175,8 +175,9 @@ def export_tiled_image(
             print(f"[{idx}/{len(tiles)}] Skipping existing tile -> {tile_path}")
             continue
         print(f"[{idx}/{len(tiles)}] Exporting tile row={row} col={col} -> {tile_path} ...")
+        tile_image = image.clip(tile_region).unmask(DYNAMICWORLD_NODATA).toInt16()
         geemap.ee_export_image(
-            image.clip(tile_region),
+            tile_image,
             filename=str(tile_path),
             region=tile_region,
             crs=crs,

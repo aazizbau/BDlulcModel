@@ -205,8 +205,9 @@ def export_tile(
     crs: str,
     scale: int,
 ) -> None:
+    tile_image = image.clip(tile_region).unmask(DYNAMICWORLD_NODATA).toInt16()
     geemap.ee_export_image(
-        image.clip(tile_region),
+        tile_image,
         filename=str(tile_path),
         region=tile_region,
         crs=crs,
