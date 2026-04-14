@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create a 2 x 4 comparison figure for random AOIs:
+Create a 3 x 4 comparison figure for random AOIs:
 - column 1: Sentinel-2 RGB 2017
 - column 2: LULC 2017
 - column 3: Sentinel-2 RGB 2024
@@ -43,7 +43,7 @@ import rasterio
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 from PIL import Image
-from pyproj import CRS, Geod, Transformer
+from pyproj import CRS, Transformer
 from rasterio.enums import Resampling
 from rasterio.vrt import WarpedVRT
 from rasterio.windows import Window, bounds as window_bounds
@@ -59,6 +59,23 @@ except Exception:
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PALETTE_JSON = Path("assets/color_palette_coastal_lulc.json")
 NORTH_ARROW_SVG = Path("assets/maps/NorthArrow.svg")
+
+NORTH_ARROW_X = 0.90
+NORTH_ARROW_Y = 0.035
+NORTH_ARROW_W = 0.055
+NORTH_ARROW_H = 0.075
+
+SCALEBAR_X_FRAC = -0.25
+SCALEBAR_Y = 0.035
+SCALEBAR_H = 0.07
+
+LEGEND_FONTSIZE = 14
+LEGEND_HANDLE_LENGTH = 1.7
+LEGEND_HANDLE_HEIGHT = 1.5
+LEGEND_COLUMN_SPACING = 1.0
+LEGEND_NCOL = 5
+LEGEND_X = 0.5
+LEGEND_Y = -0.03
 
 LULC_NAMES = {
     1: "Urban / Institutional Built-up",
@@ -115,7 +132,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--window-width-px", type=int, default=1024)
     p.add_argument("--window-height-px", type=int, default=768)
     p.add_argument("--max-attempts", type=int, default=250)
-    p.add_argument("--n-rows", type=int, default=2)
+    p.add_argument("--n-rows", type=int, default=3)
     p.add_argument("--dpi", type=int, default=300)
     p.add_argument("--add-main-title", action="store_true")
     return p.parse_args()
@@ -179,7 +196,7 @@ def load_svg_as_image(svg_path: Path, target_height_px: int = 220):
 
 
 def add_north_arrow(fig: plt.Figure, bg_color: str, text_color: str) -> None:
-    ax = fig.add_axes([0.90, 0.01, 0.055, 0.075])
+    ax = fig.add_axes([NORTH_ARROW_X, NORTH_ARROW_Y, NORTH_ARROW_W, NORTH_ARROW_H])
     ax.axis("off")
     ax.set_facecolor(bg_color)
     img = load_svg_as_image(resolve_path(NORTH_ARROW_SVG), target_height_px=160)
@@ -190,15 +207,7 @@ def add_north_arrow(fig: plt.Figure, bg_color: str, text_color: str) -> None:
     ax.text(0.5, 0.30, "↑", ha="center", va="center", fontsize=22, fontweight="bold", color=text_color)
 
 
-def choose_nice_scalebar_km(max_length_km: float) -> float:
-    nice = np.array([0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 25, 50, 75, 100, 150, 200], dtype=float)
-    valid = nice[nice <= max_length_km]
-    if len(valid) == 0:
-        return float(max_length_km)
-    return float(valid[-1])
-
-
-def add_figure_scalebar(
+def add_fixed_scalebar(
     fig: plt.Figure,
     anchor_ax: plt.Axes,
     extent: tuple[float, float, float, float],
@@ -209,22 +218,17 @@ def add_figure_scalebar(
 ) -> None:
     xmin, xmax, ymin, ymax = extent
     if "4326" in crs.to_string() or getattr(crs, "is_geographic", False):
-        geod = Geod(ellps="WGS84")
-        mid_lat = 0.5 * (ymin + ymax)
-        width_m = geod.inv(xmin, mid_lat, xmax, mid_lat)[2]
-    else:
-        width_m = xmax - xmin
+        raise ValueError("Expected projected CRS for fixed metric scale bar.")
+    width_m = xmax - xmin
     if width_m <= 0:
         return
 
-    length_km = choose_nice_scalebar_km((width_m / 1000.0) * 0.30)
-    bar_frac = (length_km * 1000.0) / width_m
-
+    bar_frac = 10_000.0 / width_m
     bbox = anchor_ax.get_position()
     scalebar_width = bbox.width * bar_frac
-    scalebar_left = bbox.x0 + bbox.width * 0.05
-    scalebar_bottom = 0.012
-    scalebar_height = 0.07
+    scalebar_left = bbox.x0 + bbox.width * SCALEBAR_X_FRAC
+    scalebar_bottom = SCALEBAR_Y
+    scalebar_height = SCALEBAR_H
 
     ax = fig.add_axes([scalebar_left, scalebar_bottom, scalebar_width, scalebar_height])
     ax.axis("off")
@@ -236,8 +240,8 @@ def add_figure_scalebar(
     ax.add_patch(mpatches.Rectangle((x0, y0), step_w, 0.18, facecolor="black", edgecolor=edge_color, linewidth=1.0))
     ax.add_patch(mpatches.Rectangle((x0 + step_w, y0), step_w, 0.18, facecolor="white", edgecolor=edge_color, linewidth=1.0))
     ax.text(x0, y0 - 0.08, "0", ha="center", va="top", fontsize=13, color=text_color)
-    ax.text(x0 + step_w, y0 - 0.08, f"{length_km / 2:g}", ha="center", va="top", fontsize=13, color=text_color)
-    ax.text(x0 + total_w, y0 - 0.08, f"{length_km:g} km", ha="center", va="top", fontsize=13, color=text_color)
+    ax.text(x0 + step_w, y0 - 0.08, "5", ha="center", va="top", fontsize=13, color=text_color)
+    ax.text(x0 + total_w, y0 - 0.08, "10 km", ha="center", va="top", fontsize=13, color=text_color)
 
 
 def aligned_view(src: rasterio.DatasetReader, ref: rasterio.DatasetReader, resampling: Resampling) -> rasterio.DatasetReader:
@@ -534,16 +538,16 @@ def main() -> None:
     fig.legend(
         handles=legend_handles,
         loc="lower center",
-        ncol=5,
+        ncol=LEGEND_NCOL,
         frameon=True,
         framealpha=0.96,
-        bbox_to_anchor=(0.5, -0.06),
+        bbox_to_anchor=(LEGEND_X, LEGEND_Y),
         edgecolor=colors["edge"],
         facecolor=colors["panel_bg"],
-        fontsize=11,
-        handlelength=1.6,
-        handleheight=1.2,
-        columnspacing=1.0,
+        fontsize=LEGEND_FONTSIZE,
+        handlelength=LEGEND_HANDLE_LENGTH,
+        handleheight=LEGEND_HANDLE_HEIGHT,
+        columnspacing=LEGEND_COLUMN_SPACING,
     )
 
     if args.add_main_title:
@@ -557,7 +561,7 @@ def main() -> None:
 
     sample_extent = rows_payload[0]["extent"]
     sample_crs = rows_payload[0]["plot_crs"]
-    add_figure_scalebar(fig, axes[0][0], sample_extent, sample_crs, colors["text"], colors["edge"], colors["panel_bg"])
+    add_fixed_scalebar(fig, axes[0][0], sample_extent, sample_crs, colors["text"], colors["edge"], colors["panel_bg"])
     add_north_arrow(fig, colors["panel_bg"], colors["text"])
     top_margin = 0.92 if args.add_main_title else 0.965
     fig.subplots_adjust(left=0.055, right=0.985, top=top_margin, bottom=0.14, wspace=0.08, hspace=0.30)
