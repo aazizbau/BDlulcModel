@@ -29,6 +29,7 @@ python scripts/visualization/visualize_sixlulc_transition_2017vs2024.py
 from __future__ import annotations
 
 import argparse
+import csv
 import io
 import json
 from datetime import datetime, timedelta, timezone
@@ -41,6 +42,7 @@ import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
+from rasterio.features import rasterize
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.patches import Patch, Rectangle
 from matplotlib.ticker import FuncFormatter, MaxNLocator
@@ -351,6 +353,60 @@ def compute_stats_from_counter(counter: dict[str, int], px_area_km2: float, focu
     return stats
 
 
+def counter_rows(
+    counter: dict[str, int],
+    px_area_km2: float,
+    focus_label: str,
+    map_key: str,
+    scope_name: str,
+    zone_key: str,
+    zone_label: str,
+) -> list[dict[str, object]]:
+    total_valid = counter["unchanged"] + counter["focus"] + counter["other_change"]
+    total_changed = counter["focus"] + counter["other_change"]
+    class_defs = [
+        ("0", "Unchanged", 0, counter["unchanged"]),
+        ("1", focus_label, 1, counter["focus"]),
+        ("2", "Other Change", 1, counter["other_change"]),
+    ]
+    rows: list[dict[str, object]] = []
+    for class_id, class_label, is_changed_class, pixel_count in class_defs:
+        area_km2 = pixel_count * px_area_km2
+        percent_of_valid_area = (pixel_count / total_valid * 100.0) if total_valid > 0 else 0.0
+        percent_of_changed_area = (pixel_count / total_changed * 100.0) if (total_changed > 0 and is_changed_class == 1) else 0.0
+        rows.append(
+            {
+                "map_key": map_key,
+                "focus_label": focus_label,
+                "scope_name": scope_name,
+                "zone_key": zone_key,
+                "zone_label": zone_label,
+                "class_id": class_id,
+                "class_label": class_label,
+                "is_changed_class": is_changed_class,
+                "pixel_count": pixel_count,
+                "area_km2": area_km2,
+                "percent_of_valid_area": percent_of_valid_area,
+                "percent_of_changed_area": percent_of_changed_area,
+                "total_valid_pixels": total_valid,
+                "total_changed_pixels": total_changed,
+                "total_valid_area_km2": total_valid * px_area_km2,
+                "total_changed_area_km2": total_changed * px_area_km2,
+                "nodata_pixels": counter["nodata"],
+            }
+        )
+    return rows
+
+
+def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
+    if not rows:
+        raise ValueError(f"No rows to write for CSV: {path}")
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def update_focus_counters(
     counters: dict[str, dict[str, int]],
     from_class: np.ndarray,
@@ -381,11 +437,55 @@ def update_focus_counters(
         counters[key]["nodata"] += nodata_count
 
 
+def update_focus_counters_single(
+    counter: dict[str, int],
+    from_class: np.ndarray,
+    to_class: np.ndarray,
+    nodata_mask: np.ndarray,
+    map_key: str,
+) -> None:
+    stable = (from_class == to_class) & (~nodata_mask)
+    changed = (~stable) & (~nodata_mask)
+
+    focus_masks = {
+        "map1_urban_infrastructure_expansion": changed & np.isin(to_class, [1, 3]),
+        "map2_rural_settlement_expansion": changed & (to_class == 2),
+        "map3_productive_land_conversion": changed & ((to_class == 6) | (to_class == 5) | ((to_class == 4) & (from_class != 6))),
+        "map4_water_expansion_erosion": changed & ((to_class == 8) | ((to_class == 7) & (from_class != 8))),
+        "map5_ecological_recovery": changed & ((to_class == 9) | ((to_class == 5) & (from_class != 9))),
+        "map6_ecological_degradation": changed & ((from_class == 9) | ((from_class == 5) & (to_class != 9))),
+    }
+
+    counter["unchanged"] += int(stable.sum())
+    counter["focus"] += int(focus_masks[map_key].sum())
+    counter["other_change"] += int(changed.sum()) - int(focus_masks[map_key].sum())
+    counter["nodata"] += int(nodata_mask.sum())
+
+
 def choose_zone_field(gdf: gpd.GeoDataFrame) -> str:
     for col in ["zone", "Zone", "ZONE", "zone_name", "Zone_Name", "ZONE_NAME", "name", "Name", "NAME"]:
         if col in gdf.columns:
             return col
     raise ValueError(f"Could not find a zone name field in {list(gdf.columns)}")
+
+
+def build_zone_records(gdf: gpd.GeoDataFrame, zone_field: str) -> list[dict[str, object]]:
+    records: list[dict[str, object]] = []
+    for idx, (_, row) in enumerate(gdf.iterrows(), start=1):
+        geom = row.geometry
+        if geom is None or geom.is_empty:
+            continue
+        zone_key = str(row[zone_field]).strip().lower()
+        zone_label = ZONE_LABELS.get(zone_key, str(row[zone_field]).strip())
+        records.append(
+            {
+                "zone_id": idx,
+                "zone_key": zone_key,
+                "zone_label": zone_label,
+                "geometry": geom,
+            }
+        )
+    return records
 
 
 def render_rgb(arr: np.ndarray, focus_color: str, sea_color: str) -> np.ndarray:
@@ -541,19 +641,6 @@ def main() -> None:
 
     log("Building six separate focus map statistics blockwise.")
     stats_counters = {key: init_stats_counter() for key in MAP_SPECS}
-    with rasterio.open(input_path) as src:
-        for _, window in src.block_windows(1):
-            block = src.read(1, window=window)
-            nodata_mask = block == nodata
-            from_class, to_class = decode_transition(block)
-            update_focus_counters(stats_counters, from_class, to_class, nodata_mask)
-
-    with rasterio.open(input_path) as src:
-        preview = read_downsampled_raster_windowed(src, MAX_DISPLAY_SIZE, DISPLAY_CHUNK_SIZE)
-    preview_nodata = preview == nodata
-    preview_from, preview_to = decode_transition(preview)
-    preview_maps = build_maps(preview_from, preview_to, preview_nodata)
-
     zones = gpd.read_file(zone_map)
     if zones.empty:
         raise ValueError("Zone map is empty.")
@@ -561,6 +648,47 @@ def main() -> None:
         raise ValueError("Zone map has no CRS.")
     zones = zones.to_crs(raster_crs)
     zone_field = choose_zone_field(zones)
+    zone_records = build_zone_records(zones, zone_field)
+    zone_shapes = [(record["geometry"], int(record["zone_id"])) for record in zone_records]
+    zone_counters = {
+        key: {int(record["zone_id"]): init_stats_counter() for record in zone_records}
+        for key in MAP_SPECS
+    }
+
+    with rasterio.open(input_path) as src:
+        for _, window in src.block_windows(1):
+            block = src.read(1, window=window)
+            nodata_mask = block == nodata
+            from_class, to_class = decode_transition(block)
+            update_focus_counters(stats_counters, from_class, to_class, nodata_mask)
+
+            zone_block = rasterize(
+                zone_shapes,
+                out_shape=block.shape,
+                transform=src.window_transform(window),
+                fill=0,
+                dtype="uint8",
+                all_touched=False,
+            )
+            for record in zone_records:
+                zone_id = int(record["zone_id"])
+                zone_mask = zone_block == zone_id
+                if not np.any(zone_mask):
+                    continue
+                zone_nodata_mask = nodata_mask | (~zone_mask)
+                for map_key in MAP_SPECS:
+                    update_focus_counters_single(
+                        zone_counters[map_key][zone_id],
+                        from_class,
+                        to_class,
+                        zone_nodata_mask,
+                        map_key,
+                    )
+
+        preview = read_downsampled_raster_windowed(src, MAX_DISPLAY_SIZE, DISPLAY_CHUNK_SIZE)
+    preview_nodata = preview == nodata
+    preview_from, preview_to = decode_transition(preview)
+    preview_maps = build_maps(preview_from, preview_to, preview_nodata)
 
     master_summary = {
         "input": str(input_path),
@@ -577,6 +705,8 @@ def main() -> None:
     for key, spec in MAP_SPECS.items():
         png_path = outdir / f"lulc_transition_2017_vs_2024_{key}.png"
         json_path = outdir / f"lulc_transition_2017_vs_2024_{key}_stats.json"
+        total_csv_path = outdir / f"lulc_transition_2017_vs_2024_{key}_total.csv"
+        zonewise_csv_path = outdir / f"lulc_transition_2017_vs_2024_{key}_zonewise.csv"
         log(f"Rendering {key}: {png_path}")
         render_single(
             preview_maps[key],
@@ -600,9 +730,35 @@ def main() -> None:
         )
         stats = compute_stats_from_counter(stats_counters[key], px_area_km2, spec["label"])
         json_path.write_text(json.dumps(stats, indent=2), encoding="utf-8")
+        total_rows = counter_rows(
+            stats_counters[key],
+            px_area_km2=px_area_km2,
+            focus_label=spec["label"],
+            map_key=key,
+            scope_name="total",
+            zone_key="total",
+            zone_label="Whole Study Area",
+        )
+        zonewise_rows: list[dict[str, object]] = []
+        for record in zone_records:
+            zonewise_rows.extend(
+                counter_rows(
+                    zone_counters[key][int(record["zone_id"])],
+                    px_area_km2=px_area_km2,
+                    focus_label=spec["label"],
+                    map_key=key,
+                    scope_name=f"zone_{int(record['zone_id'])}",
+                    zone_key=str(record["zone_key"]),
+                    zone_label=str(record["zone_label"]),
+                )
+            )
+        write_csv(total_csv_path, total_rows)
+        write_csv(zonewise_csv_path, zonewise_rows)
         master_summary["outputs"][key] = {
             "png": str(png_path),
             "stats_json": str(json_path),
+            "total_csv": str(total_csv_path),
+            "zonewise_csv": str(zonewise_csv_path),
             "focus_label": spec["label"],
         }
 
