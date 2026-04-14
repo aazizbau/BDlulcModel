@@ -58,6 +58,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PALETTE_JSON = Path("assets/color_palette_coastal_lulc.json")
 NORTH_ARROW_SVG = Path("assets/maps/NorthArrow.svg")
 
+NORTH_ARROW_X = 0.90
+NORTH_ARROW_Y = 0.01
+NORTH_ARROW_W = 0.055
+NORTH_ARROW_H = 0.075
+
+SCALEBAR_X_FRAC = -0.25
+SCALEBAR_Y = 0.012
+SCALEBAR_H = 0.07
+
 MY_LULC_NAMES = {
     1: "Urban / Institutional Built-up",
     2: "Rural Settlement (Homestead Vegetation)",
@@ -205,7 +214,7 @@ def load_svg_as_image(svg_path: Path, target_height_px: int = 220):
 
 
 def add_north_arrow(fig: plt.Figure, bg_color: str, text_color: str) -> None:
-    ax = fig.add_axes([0.90, 0.01, 0.055, 0.075])
+    ax = fig.add_axes([NORTH_ARROW_X, NORTH_ARROW_Y, NORTH_ARROW_W, NORTH_ARROW_H])
     ax.axis("off")
     ax.set_facecolor(bg_color)
     img = load_svg_as_image(resolve_path(NORTH_ARROW_SVG), target_height_px=160)
@@ -226,9 +235,9 @@ def add_fixed_scalebar(fig: plt.Figure, anchor_ax: plt.Axes, extent: tuple[float
     bar_frac = 10_000.0 / width_m
     bbox = anchor_ax.get_position()
     scalebar_width = bbox.width * bar_frac
-    scalebar_left = bbox.x0 + bbox.width * 0.05
-    scalebar_bottom = 0.012
-    scalebar_height = 0.07
+    scalebar_left = bbox.x0 + bbox.width * SCALEBAR_X_FRAC
+    scalebar_bottom = SCALEBAR_Y
+    scalebar_height = SCALEBAR_H
 
     ax = fig.add_axes([scalebar_left, scalebar_bottom, scalebar_width, scalebar_height])
     ax.axis("off")
