@@ -59,13 +59,21 @@ PALETTE_JSON = Path("assets/color_palette_coastal_lulc.json")
 NORTH_ARROW_SVG = Path("assets/maps/NorthArrow.svg")
 
 NORTH_ARROW_X = 0.90
-NORTH_ARROW_Y = 0.01
+NORTH_ARROW_Y = 0.035
 NORTH_ARROW_W = 0.055
 NORTH_ARROW_H = 0.075
 
 SCALEBAR_X_FRAC = -0.25
-SCALEBAR_Y = 0.012
+SCALEBAR_Y = 0.035
 SCALEBAR_H = 0.07
+
+LEGEND_FONTSIZE = 14
+LEGEND_HANDLE_LENGTH = 1.7
+LEGEND_HANDLE_HEIGHT = 1.5
+LEGEND_COLUMN_SPACING = 1.0
+LEGEND_NCOL = 5
+LEGEND_X = 0.5
+LEGEND_Y = -0.03
 
 MY_LULC_NAMES = {
     1: "Urban / Institutional Built-up",
@@ -568,16 +576,16 @@ def main() -> None:
     fig.legend(
         handles=legend_handles,
         loc="lower center",
-        ncol=5,
+        ncol=LEGEND_NCOL,
         frameon=True,
         framealpha=0.96,
-        bbox_to_anchor=(0.5, -0.06),
+        bbox_to_anchor=(LEGEND_X, LEGEND_Y),
         edgecolor=colors["edge"],
         facecolor=colors["panel_bg"],
-        fontsize=11,
-        handlelength=1.6,
-        handleheight=1.2,
-        columnspacing=1.0,
+        fontsize=LEGEND_FONTSIZE,
+        handlelength=LEGEND_HANDLE_LENGTH,
+        handleheight=LEGEND_HANDLE_HEIGHT,
+        columnspacing=LEGEND_COLUMN_SPACING,
     )
 
     if args.add_main_title:
