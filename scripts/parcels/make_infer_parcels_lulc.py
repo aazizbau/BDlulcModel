@@ -61,15 +61,15 @@ DEFAULT_FIGURES_ROOT = Path("outputs/figures")
 UPAZILA_CHOICES = ("bamna", "amtali", "betagi", "manpura")
 
 FIGSIZE = (9.5, 8.5)
-FIG_DPI = 300
+FIG_DPI = 450
 LONGITUDE_LABEL_PAD = 0
 TIGHT_LAYOUT_BOTTOM = -0.02
 CLASS_NODATA = 0
 SCALEBAR_LENGTH_KM = 10
 SCALEBAR_X_FRAC = 0.05
 SCALEBAR_Y_FRAC = 0.04
-LEGEND_X_FRAC = 1.01
-LEGEND_Y_FRAC = 1.00
+LEGEND_X_FRAC = 0.985
+LEGEND_Y_FRAC = 0.02
 LEGEND_FONTSIZE = 10
 LEGEND_HANDLE_LENGTH = 1.6
 LEGEND_HANDLE_HEIGHT = 1.2
@@ -378,7 +378,7 @@ def main() -> None:
             ax=ax,
             facecolor=LULC_COLORS[class_id],
             edgecolor=edge_color,
-            linewidth=0.15,
+            linewidth=0.22,
             zorder=2,
         )
 
@@ -388,12 +388,12 @@ def main() -> None:
             ax=ax,
             facecolor="#D9D9D9",
             edgecolor=edge_color,
-            linewidth=0.15,
+            linewidth=0.22,
             zorder=1,
         )
 
-    parcels.boundary.plot(ax=ax, color="#FFF9EF", linewidth=0.35, zorder=3)
-    parcels.boundary.plot(ax=ax, color=edge_color, linewidth=0.12, zorder=4)
+    parcels.boundary.plot(ax=ax, color="#FFF9EF", linewidth=0.50, zorder=3)
+    parcels.boundary.plot(ax=ax, color=edge_color, linewidth=0.20, zorder=4)
 
     xmin, ymin, xmax, ymax = bounds
     pad_x = 0.04 * (xmax - xmin)
@@ -423,7 +423,7 @@ def main() -> None:
 
     legend = ax.legend(
         handles=legend_handles(),
-        loc="upper left",
+        loc="lower right",
         bbox_to_anchor=(LEGEND_X_FRAC, LEGEND_Y_FRAC),
         fontsize=LEGEND_FONTSIZE,
         frameon=True,
@@ -443,7 +443,7 @@ def main() -> None:
         spine.set_edgecolor(title_color)
 
     output_png.parent.mkdir(parents=True, exist_ok=True)
-    plt.tight_layout(rect=(0, TIGHT_LAYOUT_BOTTOM, 0.82, 1))
+    plt.tight_layout(rect=(0, TIGHT_LAYOUT_BOTTOM, 1, 1))
     plt.savefig(output_png, dpi=FIG_DPI, bbox_inches="tight", facecolor=fig_bg)
     plt.close(fig)
 
