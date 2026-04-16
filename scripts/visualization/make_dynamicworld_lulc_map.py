@@ -151,6 +151,17 @@ def decimal_to_dm(value: float, kind: str) -> str:
     return f"{d}°{m:02d}′{hemi}"
 
 
+def meters_to_lat_degrees(meters: float) -> float:
+    return meters / 111_320.0
+
+
+def km_to_lon_degrees(km: float, lat_deg: float) -> float:
+    cos_lat = np.cos(np.deg2rad(lat_deg))
+    if abs(cos_lat) < 1e-8:
+        cos_lat = 1e-8
+    return km / (111.320 * cos_lat)
+
+
 def add_graticule(ax, color: str, src_crs) -> None:
     src_crs = CRS.from_user_input(src_crs)
     dst_crs = CRS.from_epsg(4326)
@@ -178,12 +189,16 @@ def add_graticule(ax, color: str, src_crs) -> None:
         label.set_ha("center")
 
 
-def add_scalebar_2step(ax, length_km=150, location=(0.38, 0.06), fontsize=10):
+def add_scalebar_2step(ax, length_km=150, location=(0.38, 0.06), fontsize=10, is_geographic=False):
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
     x0 = xlim[0] + location[0] * (xlim[1] - xlim[0])
     y0 = ylim[0] + location[1] * (ylim[1] - ylim[0])
-    total_map_units = length_km * 1000.0
+    if is_geographic:
+        mid_lat = 0.5 * (ylim[0] + ylim[1])
+        total_map_units = km_to_lon_degrees(length_km, mid_lat)
+    else:
+        total_map_units = length_km * 1000.0
     step_map_units = total_map_units / 2.0
     bar_h = 0.014 * (ylim[1] - ylim[0])
 
@@ -315,6 +330,7 @@ def main() -> None:
         if ds.crs is None:
             raise ValueError("Input Dynamic World raster has no CRS.")
         raster_crs = ds.crs
+        is_geographic = CRS.from_user_input(raster_crs).is_geographic
         bounds = ds.bounds
         classes = read_downsampled_class_raster_windowed(
             ds,
@@ -360,6 +376,8 @@ def main() -> None:
         label = ZONE_LABELS.get(zone_key, zone_key.title())
         pt = geom.representative_point()
         dx, dy = ZONE_LABEL_OFFSETS.get(zone_key, (0.0, 0.0))
+        if is_geographic:
+            dy = meters_to_lat_degrees(dy)
         txt = ax.text(
             pt.x + dx,
             pt.y + dy,
@@ -417,7 +435,13 @@ def main() -> None:
     plt.setp(ax.get_xticklabels(), rotation=25, ha="right")
 
     add_north_arrow(ax, north_arrow, xy=(0.92, 0.90), zoom=0.23)
-    add_scalebar_2step(ax, length_km=150, location=(SCALEBAR_X_FRAC, SCALEBAR_Y_FRAC), fontsize=10)
+    add_scalebar_2step(
+        ax,
+        length_km=150,
+        location=(SCALEBAR_X_FRAC, SCALEBAR_Y_FRAC),
+        fontsize=10,
+        is_geographic=is_geographic,
+    )
 
     legend = ax.legend(
         handles=legend_handles(),
