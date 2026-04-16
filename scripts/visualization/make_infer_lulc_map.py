@@ -49,6 +49,7 @@ except Exception:
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ZONE_MAP = Path("assets/maps/bd_coastal_zones.gpkg")
+DEFAULT_SUNDARBANS_MAP = Path("assets/maps/sundarbans.gpkg")
 DEFAULT_NORTH_ARROW = Path("assets/maps/NorthArrow.svg")
 DEFAULT_PALETTE = Path("assets/color_palette_coastal_lulc.json")
 DEFAULT_INPUT_ROOT = Path("outputs/inference")
@@ -107,6 +108,10 @@ ZONE_LABELS = {
     "eastern": "Eastern Zone",
 }
 
+ZONE_LABEL_OFFSETS = {
+    "western": (0.0, 26000.0),
+}
+
 
 def resolve_path(path: Path) -> Path:
     return path if path.is_absolute() else PROJECT_ROOT / path
@@ -125,6 +130,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--year", type=int, required=True, help="Target year, e.g. 2017 or 2024.")
     p.add_argument("--input", type=Path, default=None, help="Optional inferred LULC GeoTIFF override.")
     p.add_argument("--zone-map", type=Path, default=DEFAULT_ZONE_MAP, help="Coastal zones vector layer.")
+    p.add_argument("--sundarbans-map", type=Path, default=DEFAULT_SUNDARBANS_MAP, help="Sundarbans vector layer.")
     p.add_argument("--north-arrow", type=Path, default=DEFAULT_NORTH_ARROW, help="North arrow SVG path.")
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
     p.add_argument("--output", type=Path, default=None, help="Output PNG path.")
@@ -282,6 +288,7 @@ def main() -> None:
     args = parse_args()
     input_raster = resolve_path(args.input or default_input_path(args.year))
     zone_map = resolve_path(args.zone_map)
+    sundarbans_map = resolve_path(args.sundarbans_map)
     north_arrow = resolve_path(args.north_arrow)
     palette_path = resolve_path(args.palette)
     output = resolve_path(args.output or default_output_path(args.year))
@@ -295,6 +302,7 @@ def main() -> None:
     zone_edge = "#2b2e07"# "#7e8a00" # "#8a5700"
     main_text_color = colors["deep_slate"]
     zone_text_color = colors["coral"]
+    sundarbans_text_color = colors["deep_slate"]
     bay_text_color = colors["teal_blue"]
     legend_face = "#FFF9EF"
 
@@ -318,6 +326,13 @@ def main() -> None:
         raise ValueError("Zone map has no CRS.")
     zones = zones.to_crs(raster_crs)
 
+    sundarbans = gpd.read_file(sundarbans_map)
+    if sundarbans.empty:
+        raise ValueError("Sundarbans vector is empty.")
+    if sundarbans.crs is None:
+        raise ValueError("Sundarbans vector has no CRS.")
+    sundarbans = sundarbans.to_crs(raster_crs)
+
     fig, ax = plt.subplots(figsize=FIGSIZE, dpi=FIG_DPI, facecolor=fig_bg)
     ax.set_facecolor(sea_color)
 
@@ -330,6 +345,7 @@ def main() -> None:
     )
 
     zones.boundary.plot(ax=ax, color=zone_edge, linewidth=1.4, zorder=4)
+    sundarbans.boundary.plot(ax=ax, color=zone_edge, linewidth=1.4, zorder=5)
 
     for _, row in zones.iterrows():
         geom = row.geometry
@@ -338,15 +354,35 @@ def main() -> None:
         zone_key = str(row["zone"]).strip().lower()
         label = ZONE_LABELS.get(zone_key, zone_key.title())
         pt = geom.representative_point()
+        dx, dy = ZONE_LABEL_OFFSETS.get(zone_key, (0.0, 0.0))
         txt = ax.text(
-            pt.x,
-            pt.y,
+            pt.x + dx,
+            pt.y + dy,
             label,
             fontsize=12,
             fontweight="bold",
             ha="center",
             va="center",
             color=zone_text_color,
+            zorder=6,
+        )
+        txt.set_path_effects([pe.Stroke(linewidth=3, foreground=fig_bg), pe.Normal()])
+
+    for _, row in sundarbans.iterrows():
+        geom = row.geometry
+        if geom is None or geom.is_empty:
+            continue
+        label = str(row["zone"]).strip()
+        pt = geom.representative_point()
+        txt = ax.text(
+            pt.x,
+            pt.y,
+            label,
+            fontsize=10,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            color=sundarbans_text_color,
             zorder=6,
         )
         txt.set_path_effects([pe.Stroke(linewidth=3, foreground=fig_bg), pe.Normal()])
