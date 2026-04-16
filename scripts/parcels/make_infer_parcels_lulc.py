@@ -40,6 +40,7 @@ from matplotlib.ticker import FuncFormatter, MaxNLocator
 from PIL import Image
 from pyproj import CRS, Transformer
 from rasterio.features import geometry_mask
+from rasterio.windows import Window
 from rasterio.windows import from_bounds
 
 try:
@@ -259,8 +260,19 @@ def set_geographic_aspect(ax, bounds, crs) -> None:
 def majority_class_for_geometry(src: rasterio.io.DatasetReader, geom, nodata_value: int) -> tuple[int, int, int, float]:
     window = from_bounds(*geom.bounds, transform=src.transform)
     window = window.round_offsets().round_lengths()
-    full_window = rasterio.windows.Window(0, 0, src.width, src.height)
-    window = window.intersection(full_window)
+
+    if window.width <= 0 or window.height <= 0:
+        return nodata_value, 0, 0, 0.0
+
+    col_off = max(0, int(window.col_off))
+    row_off = max(0, int(window.row_off))
+    col_end = min(src.width, int(window.col_off + window.width))
+    row_end = min(src.height, int(window.row_off + window.height))
+
+    if col_end <= col_off or row_end <= row_off:
+        return nodata_value, 0, 0, 0.0
+
+    window = Window(col_off, row_off, col_end - col_off, row_end - row_off)
 
     if window.width <= 0 or window.height <= 0:
         return nodata_value, 0, 0, 0.0
