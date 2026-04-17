@@ -16,7 +16,7 @@ Outputs
 
 Example
 -------
-python scripts/parcels/make_infer_parcels_lulc.py \
+python scripts/parcels/make_infer_parcels_lulc_chatgpt.py \
     --year 2017 \
     --upazila-parcels bamna
 """
