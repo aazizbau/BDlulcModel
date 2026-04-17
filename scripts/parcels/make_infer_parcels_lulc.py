@@ -19,6 +19,36 @@ Example
 python scripts/parcels/make_infer_parcels_lulc.py \
     --year 2017 \
     --upazila-parcels bamna
+
+python scripts/parcels/make_infer_parcels_lulc.py \
+    --year 2017 \
+    --upazila-parcels amtali \
+    --scalebar-x-frac 0.07 \
+    --scalebar-y-frac -0.05 \
+    --north-arrow-x-frac 0.97 \
+    --north-arrow-y-frac 0.90 \
+    --legend-x-frac 1.05 \
+    --legend-y-frac -0.06
+
+python scripts/parcels/make_infer_parcels_lulc.py \
+    --year 2017 \
+    --upazila-parcels betagi \
+    --scalebar-x-frac 0.15 \
+    --scalebar-y-frac -0.05 \
+    --north-arrow-x-frac 1.0 \
+    --north-arrow-y-frac 0.90 \
+    --legend-x-frac 1.28 \
+    --legend-y-frac 0.00
+		
+python scripts/parcels/make_infer_parcels_lulc.py \
+    --year 2017 \
+    --upazila-parcels manpura \
+    --scalebar-x-frac 0.15 \
+    --scalebar-y-frac -0.05 \
+    --north-arrow-x-frac 1.3 \
+    --north-arrow-y-frac 0.90 \
+    --legend-x-frac 1.68 \
+    --legend-y-frac -0.05
 """
 
 from __future__ import annotations
