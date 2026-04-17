@@ -146,6 +146,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
     p.add_argument("--output-gpkg", type=Path, default=None, help="Output parcel GPKG path.")
     p.add_argument("--output-png", type=Path, default=None, help="Output figure PNG path.")
+    p.add_argument("--scalebar-x-frac", type=float, default=SCALEBAR_X_FRAC, help="Scale bar x position in axes fraction.")
+    p.add_argument("--scalebar-y-frac", type=float, default=SCALEBAR_Y_FRAC, help="Scale bar y position in axes fraction.")
+    p.add_argument("--north-arrow-x-frac", type=float, default=NORTH_ARROW_X_FRAC, help="North arrow x position in axes fraction.")
+    p.add_argument("--north-arrow-y-frac", type=float, default=NORTH_ARROW_Y_FRAC, help="North arrow y position in axes fraction.")
+    p.add_argument("--legend-x-frac", type=float, default=LEGEND_X_FRAC, help="Legend x position in axes fraction.")
+    p.add_argument("--legend-y-frac", type=float, default=LEGEND_Y_FRAC, help="Legend y position in axes fraction.")
     return p.parse_args()
 
 
@@ -339,11 +345,18 @@ def legend_handles() -> list[Patch]:
     ]
 
 
-def compute_frame_expansion() -> dict[str, float]:
-    min_x = min(0.0, LEGEND_X_FRAC, NORTH_ARROW_X_FRAC, SCALEBAR_X_FRAC)
-    max_x = max(1.0, LEGEND_X_FRAC, NORTH_ARROW_X_FRAC, SCALEBAR_X_FRAC)
-    min_y = min(0.0, LEGEND_Y_FRAC, NORTH_ARROW_Y_FRAC, SCALEBAR_Y_FRAC)
-    max_y = max(1.0, LEGEND_Y_FRAC, NORTH_ARROW_Y_FRAC, SCALEBAR_Y_FRAC)
+def compute_frame_expansion(
+    legend_x_frac: float,
+    legend_y_frac: float,
+    north_arrow_x_frac: float,
+    north_arrow_y_frac: float,
+    scalebar_x_frac: float,
+    scalebar_y_frac: float,
+) -> dict[str, float]:
+    min_x = min(0.0, legend_x_frac, north_arrow_x_frac, scalebar_x_frac)
+    max_x = max(1.0, legend_x_frac, north_arrow_x_frac, scalebar_x_frac)
+    min_y = min(0.0, legend_y_frac, north_arrow_y_frac, scalebar_y_frac)
+    max_y = max(1.0, legend_y_frac, north_arrow_y_frac, scalebar_y_frac)
 
     extra_left = max(0.0, -min_x) + DECORATION_PAD_FRAC
     extra_right = max(0.0, max_x - 1.0) + DECORATION_PAD_FRAC
@@ -404,6 +417,12 @@ def main() -> None:
     palette_path = resolve_path(args.palette)
     output_gpkg = resolve_path(args.output_gpkg or default_output_gpkg(args.year, args.upazila_parcels))
     output_png = resolve_path(args.output_png or default_output_png(args.year, args.upazila_parcels))
+    scalebar_x_frac = args.scalebar_x_frac
+    scalebar_y_frac = args.scalebar_y_frac
+    north_arrow_x_frac = args.north_arrow_x_frac
+    north_arrow_y_frac = args.north_arrow_y_frac
+    legend_x_frac = args.legend_x_frac
+    legend_y_frac = args.legend_y_frac
 
     palette = load_palette(palette_path)
     colors = palette["colors"]
@@ -453,13 +472,20 @@ def main() -> None:
     parcels.to_file(output_gpkg, driver="GPKG")
 
     bounds = parcels.total_bounds
-    expansion = compute_frame_expansion()
+    expansion = compute_frame_expansion(
+        legend_x_frac=legend_x_frac,
+        legend_y_frac=legend_y_frac,
+        north_arrow_x_frac=north_arrow_x_frac,
+        north_arrow_y_frac=north_arrow_y_frac,
+        scalebar_x_frac=scalebar_x_frac,
+        scalebar_y_frac=scalebar_y_frac,
+    )
     fig_w, fig_h = dynamic_figure_size(expansion)
     subplot_kwargs = dynamic_subplot_kwargs(fig_w, fig_h)
 
-    legend_xy = remap_axes_fraction(LEGEND_X_FRAC, LEGEND_Y_FRAC, expansion)
-    north_arrow_xy = remap_axes_fraction(NORTH_ARROW_X_FRAC, NORTH_ARROW_Y_FRAC, expansion)
-    scalebar_xy = remap_axes_fraction(SCALEBAR_X_FRAC, SCALEBAR_Y_FRAC, expansion)
+    legend_xy = remap_axes_fraction(legend_x_frac, legend_y_frac, expansion)
+    north_arrow_xy = remap_axes_fraction(north_arrow_x_frac, north_arrow_y_frac, expansion)
+    scalebar_xy = remap_axes_fraction(scalebar_x_frac, scalebar_y_frac, expansion)
 
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=FIG_DPI, facecolor=fig_bg)
     ax.set_facecolor(fig_bg)
