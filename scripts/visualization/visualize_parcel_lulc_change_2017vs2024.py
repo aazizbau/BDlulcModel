@@ -411,18 +411,21 @@ def save_sunburst(df: pd.DataFrame, upazila: str, top_n: int, palette: dict) -> 
 
 
 def save_faceted_bar(df: pd.DataFrame, upazila: str, order: list[str], top_n: int, palette: dict) -> Path:
-    parcel_area = df.groupby("L_NAME_En")[AREA_COL].sum().sort_values(ascending=False)
+    df_plot = df.copy()
+    df_plot["L_NAME_En_plot"] = df_plot["L_NAME_En"].replace({"Khal": "Canal", "Halot": "Road"})
+
+    parcel_area = df_plot.groupby("L_NAME_En_plot")[AREA_COL].sum().sort_values(ascending=False)
     top_types = parcel_area.head(top_n).index.tolist()
-    sub = df[df["L_NAME_En"].isin(top_types)].copy()
+    sub = df_plot[df_plot["L_NAME_En_plot"].isin(top_types)].copy()
 
     n = len(top_types)
     ncols = 3
     nrows = math.ceil(n / ncols)
-    fig, axes = plt.subplots(nrows, ncols, figsize=(18, 4.8 * nrows), dpi=300, sharey=True, facecolor=palette["sand"])
+    fig, axes = plt.subplots(nrows, ncols, figsize=(18, 4.8 * nrows), dpi=300, sharey=False, facecolor=palette["sand"])
     axes = np.atleast_1d(axes).flatten()
 
     for ax, parcel_type in zip(axes, top_types):
-        sdf = sub[sub["L_NAME_En"] == parcel_type]
+        sdf = sub[sub["L_NAME_En_plot"] == parcel_type]
         area_2017 = sdf.groupby("lulc_name_2017")[AREA_COL].sum().reindex(order, fill_value=0)
         area_2024 = sdf.groupby("lulc_name_2024")[AREA_COL].sum().reindex(order, fill_value=0)
         x = np.arange(len(order))
@@ -433,6 +436,12 @@ def save_faceted_bar(df: pd.DataFrame, upazila: str, order: list[str], top_n: in
         ax.set_xticks(x)
         ax.set_xticklabels(order, rotation=55, ha="right", fontsize=8, color=palette["deep_slate"])
         ax.yaxis.set_major_formatter(mticker.StrMethodFormatter("{x:,.0f}"))
+        if parcel_type in {"Road", "Canal", "Halot"}:
+            ymax = max(float(area_2017.max()), float(area_2024.max()))
+            if ymax > 0:
+                ymax *= 1.10
+                ax.set_ylim(0, ymax)
+                ax.set_yticks(np.linspace(0, ymax, 5))
         style_axis(ax, palette, grid_axis="y")
 
     for ax in axes[n:]:
