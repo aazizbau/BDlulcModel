@@ -11,7 +11,6 @@ Outputs
 -------
 - outputs/figures/<upazila>_parcel_lulc_area_bar_2017_vs_2024.png
 - outputs/figures/<upazila>_parcel_lulc_transition_sankey_2017_vs_2024.png
-- outputs/figures/<upazila>_parcel_lulc_parceltype_sunburst_2017_vs_2024.png
 - outputs/figures/<upazila>_parcel_lulc_parceltype_faceted_bar_2017_vs_2024.png
 
 Example
@@ -289,127 +288,6 @@ def save_sankey(df: pd.DataFrame, upazila: str, order: list[str], palette: dict)
     return out
 
 
-def draw_sunburst(ax, aggregated: pd.DataFrame, parcel_types: list[str], total_area: float, palette: dict):
-    start_angle = 90.0
-    ring1 = (0.18, 0.44)
-    ring2 = (0.46, 0.70)
-    ring3 = (0.72, 0.98)
-
-    for parcel_type in parcel_types:
-        sub1 = aggregated[aggregated["L_NAME_En_plot"] == parcel_type]
-        area1 = sub1[AREA_COL].sum()
-        if area1 <= 0:
-            continue
-        span1 = 360.0 * area1 / total_area
-        theta1 = start_angle
-        theta2 = start_angle - span1
-        ax.add_patch(
-            Wedge(
-                (0, 0),
-                ring1[1],
-                theta2,
-                theta1,
-                width=ring1[1] - ring1[0],
-                facecolor=palette["ochre"],
-                edgecolor="white",
-                lw=0.7,
-            )
-        )
-
-        mid1 = math.radians((theta1 + theta2) / 2)
-        ax.text(
-            0.56 * math.cos(mid1),
-            0.56 * math.sin(mid1),
-            parcel_type,
-            ha="center",
-            va="center",
-            rotation=np.degrees(mid1) - 90,
-            rotation_mode="anchor",
-            fontsize=8,
-            color=palette["deep_slate"],
-        )
-
-        class2017_groups = sub1.groupby("lulc_name_2017", sort=False)[AREA_COL].sum().reset_index()
-        inner_start = theta1
-        for _, r2 in class2017_groups.iterrows():
-            area2 = r2[AREA_COL]
-            span2 = span1 * area2 / area1
-            t1_2 = inner_start
-            t2_2 = inner_start - span2
-            base2 = color_for_class(r2["lulc_name_2017"])
-            ax.add_patch(
-                Wedge(
-                    (0, 0),
-                    ring2[1],
-                    t2_2,
-                    t1_2,
-                    width=ring2[1] - ring2[0],
-                    facecolor=lighten(base2, 0.10),
-                    edgecolor="white",
-                    lw=0.6,
-                )
-            )
-
-            sub2 = sub1[sub1["lulc_name_2017"] == r2["lulc_name_2017"]]
-            class2024_groups = sub2.groupby("lulc_name_2024", sort=False)[AREA_COL].sum().reset_index()
-            outer_start = t1_2
-            for _, r3 in class2024_groups.iterrows():
-                area3 = r3[AREA_COL]
-                span3 = span2 * area3 / area2
-                t1_3 = outer_start
-                t2_3 = outer_start - span3
-                base3 = color_for_class(r3["lulc_name_2024"])
-                ax.add_patch(
-                    Wedge(
-                        (0, 0),
-                        ring3[1],
-                        t2_3,
-                        t1_3,
-                        width=ring3[1] - ring3[0],
-                        facecolor=base3,
-                        edgecolor="white",
-                        lw=0.5,
-                    )
-                )
-                outer_start = t2_3
-            inner_start = t2_2
-        start_angle = theta2
-
-
-def save_sunburst(df: pd.DataFrame, upazila: str, top_n: int, palette: dict) -> Path:
-    parcel_area = df.groupby("L_NAME_En")[AREA_COL].sum().sort_values(ascending=False)
-    top_types = parcel_area.head(top_n).index.tolist()
-    plot_df = df.copy()
-    plot_df["L_NAME_En_plot"] = np.where(plot_df["L_NAME_En"].isin(top_types), plot_df["L_NAME_En"], "Other")
-    aggregated = plot_df.groupby(["L_NAME_En_plot", "lulc_name_2017", "lulc_name_2024"], as_index=False)[AREA_COL].sum()
-
-    parcel_types_plot = aggregated.groupby("L_NAME_En_plot")[AREA_COL].sum().sort_values(ascending=False).index.tolist()
-    total_area = aggregated[AREA_COL].sum()
-
-    fig, ax = plt.subplots(figsize=(11, 11), dpi=300, subplot_kw=dict(aspect="equal"), facecolor=palette["sand"])
-    ax.set_facecolor(palette["sand"])
-    draw_sunburst(ax, aggregated, parcel_types_plot, total_area, palette)
-    ax.set_title(
-        f"{upazila.title()} parcel-type LULC hierarchy\nParcel type → 2017 LULC → 2024 LULC",
-        pad=18,
-        color=palette["deep_slate"],
-    )
-    ax.set_xlim(-1.15, 1.15)
-    ax.set_ylim(-1.15, 1.15)
-    ax.axis("off")
-
-    legend_handles = [Patch(facecolor=color_for_class(c), edgecolor="none", label=c) for c in class_order_from_df(df)]
-    leg = ax.legend(handles=legend_handles, loc="lower center", bbox_to_anchor=(0.5, -0.08), ncol=2, frameon=False, fontsize=9)
-    for txt in leg.get_texts():
-        txt.set_color(palette["deep_slate"])
-
-    out = resolve_path(output_path(upazila, "parceltype_sunburst"))
-    out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, bbox_inches="tight", facecolor=palette["sand"])
-    plt.close(fig)
-    return out
-
-
 def save_faceted_bar(df: pd.DataFrame, upazila: str, order: list[str], top_n: int, palette: dict) -> Path:
     df_plot = df.copy()
     df_plot["L_NAME_En_plot"] = df_plot["L_NAME_En"].replace({"Khal": "Canal", "Halot": "Road"})
@@ -448,7 +326,7 @@ def save_faceted_bar(df: pd.DataFrame, upazila: str, order: list[str], top_n: in
         ax.axis("off")
 
     handles, labels = axes[0].get_legend_handles_labels()
-    leg = fig.legend(handles, labels, loc="upper center", ncol=2, frameon=False)
+    leg = fig.legend(handles, labels, loc="upper right", ncol=2, frameon=False)
     for txt in leg.get_texts():
         txt.set_color(palette["deep_slate"])
     fig.suptitle(f"{upazila.title()} parcel-type faceted LULC area comparison: 2017 vs 2024", y=0.995, fontsize=15, color=palette["deep_slate"])
@@ -475,7 +353,6 @@ def main() -> None:
     outputs = [
         save_area_bar_chart(df, args.upazila, order, palette),
         save_sankey(df, args.upazila, order, palette),
-        save_sunburst(df, args.upazila, args.facet_top_n, palette),
         save_faceted_bar(df, args.upazila, order, args.facet_top_n, palette),
     ]
 
