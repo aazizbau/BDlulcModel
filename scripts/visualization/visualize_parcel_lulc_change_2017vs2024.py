@@ -43,31 +43,35 @@ DEFAULT_PALETTE = Path("assets/color_palette_coastal_lulc.json")
 UPAZILA_CHOICES = ("bamna", "amtali", "betagi", "manpura")
 AREA_COL = "parcel_area_m2"
 
-LULC_ORDER = [
-    "Urban / Institutional Built-up",
-    "Rural Settlement (Homestead Vegetation)",
-    "Transport & Coastal Embankments",
-    "Cropland (All Crop Intensities)",
-    "Tree-based Agroforestry & Orchard",
-    "Aquaculture & Inland Ponds",
-    "Canals & Drainage Network",
-    "Rivers & Estuarine Channels",
-    "Mangrove Forest",
-    "Bare / Exposed Coastal Land",
-]
+LULC_NAMES = {
+    1: "Urban / Institutional Built-up",
+    2: "Rural Settlement (Homestead Vegetation)",
+    3: "Transport & Coastal Embankments",
+    4: "Cropland (All Crop Intensities)",
+    5: "Tree-based Agroforestry & Orchard",
+    6: "Aquaculture & Inland Ponds",
+    7: "Canals & Drainage Network",
+    8: "Rivers & Estuarine Channels",
+    9: "Mangrove Forest",
+    10: "Bare / Exposed Coastal Land",
+}
 
 LULC_COLORS = {
-    "Urban / Institutional Built-up": "#E66A00",
-    "Rural Settlement (Homestead Vegetation)": "#8FBF7A",
-    "Transport & Coastal Embankments": "#9C7A5B",
-    "Cropland (All Crop Intensities)": "#FFC636",
-    "Tree-based Agroforestry & Orchard": "#4F7F3D",
-    "Aquaculture & Inland Ponds": "#00ADA9",
-    "Canals & Drainage Network": "#7AD9D6",
-    "Rivers & Estuarine Channels": "#007C91",
-    "Mangrove Forest": "#2F5D50",
-    "Bare / Exposed Coastal Land": "#F3E7CF",
+    1: "#E66A00",
+    2: "#8FBF7A",
+    3: "#9C7A5B",
+    4: "#FFC636",
+    5: "#4F7F3D",
+    6: "#00ADA9",
+    7: "#7AD9D6",
+    8: "#007C91",
+    9: "#2F5D50",
+    10: "#F3E7CF",
 }
+
+NAME_TO_COLOR = {name: LULC_COLORS[class_id] for class_id, name in LULC_NAMES.items()}
+LULC_ORDER = [LULC_NAMES[class_id] for class_id in sorted(LULC_NAMES)]
+NODATA_LABELS = {"NoData", "Unknown", "nan", ""}
 
 
 def resolve_path(path: Path) -> Path:
@@ -125,7 +129,9 @@ def class_order_from_df(df: pd.DataFrame) -> list[str]:
 
 
 def color_for_class(name: str) -> str:
-    return LULC_COLORS.get(name, "#B0B0B0")
+    if pd.isna(name) or str(name).strip() in NODATA_LABELS:
+        return "#000000"
+    return NAME_TO_COLOR.get(str(name).strip(), "#000000")
 
 
 def lighten(color: str, amount: float) -> tuple[float, float, float]:
