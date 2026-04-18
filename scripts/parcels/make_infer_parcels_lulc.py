@@ -65,13 +65,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
-from matplotlib.patches import Patch, Rectangle
+from matplotlib.patches import ConnectionPatch, Patch, Rectangle
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 from PIL import Image
 from pyproj import CRS, Transformer
 from rasterio.features import geometry_mask
 from rasterio.windows import Window
 from rasterio.windows import from_bounds
+from shapely.geometry import box
 
 try:
     import cairosvg
@@ -107,6 +108,15 @@ LEGEND_HANDLE_HEIGHT = 1.2
 LEGEND_LABEL_SPACING = 0.45
 LEGEND_BORDER_PAD = 0.70
 LEGEND_BOX_ALPHA = 0.97
+ZOOM_WINDOW_SIZE_M = 500.0
+ZOOM_INSET_X_FRAC = 0.54
+ZOOM_INSET_Y_FRAC = 0.52
+ZOOM_INSET_W_FRAC = 0.28
+ZOOM_INSET_H_FRAC = 0.28
+ZOOM_SCALEBAR_X_FRAC = 0.10
+ZOOM_SCALEBAR_Y_FRAC = 0.08
+ZOOM_CONNECTOR_COLOR = "#D62828"
+ZOOM_BOX_LINEWIDTH = 1.3
 
 BASE_LEFT = 0.10
 BASE_RIGHT = 0.96
@@ -207,6 +217,10 @@ def km_to_lon_degrees(km: float, lat_deg: float) -> float:
     return km / (111.320 * cos_lat)
 
 
+def km_to_lat_degrees(km: float) -> float:
+    return km / 110.574
+
+
 def add_graticule(ax, color: str, src_crs) -> None:
     src_crs = CRS.from_user_input(src_crs)
     dst_crs = CRS.from_epsg(4326)
@@ -284,6 +298,47 @@ def add_scalebar_2step(ax, length_km: float, location=(0.05, 0.04), fontsize=10,
         va="bottom",
         fontsize=fontsize,
         zorder=11,
+    )
+
+
+def choose_zoom_scalebar_length_m(max_length_m: float) -> float:
+    nice = np.array([50, 100, 200, 250], dtype=float)
+    valid = nice[nice <= max_length_m]
+    if len(valid) == 0:
+        return max_length_m
+    return float(valid[-1])
+
+
+def add_scalebar_1step(ax, length_m: float, location=(0.10, 0.08), fontsize=8, is_geographic=False):
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    x0 = xlim[0] + location[0] * (xlim[1] - xlim[0])
+    y0 = ylim[0] + location[1] * (ylim[1] - ylim[0])
+
+    if is_geographic:
+        mid_lat = 0.5 * (ylim[0] + ylim[1])
+        bar_len = km_to_lon_degrees(length_m / 1000.0, mid_lat)
+    else:
+        bar_len = length_m
+
+    tick_h = 0.020 * (ylim[1] - ylim[0])
+    x1 = x0 + bar_len
+
+    ax.plot([x0, x1], [y0, y0], color="black", linewidth=1.6, zorder=20)
+    ax.plot([x0, x0], [y0 - tick_h, y0 + tick_h], color="black", linewidth=1.2, zorder=20)
+    ax.plot([x1, x1], [y0 - tick_h, y0 + tick_h], color="black", linewidth=1.2, zorder=20)
+
+    label = f"{int(length_m)} m" if float(length_m).is_integer() else f"{length_m:.0f} m"
+    ax.text(
+        0.5 * (x0 + x1),
+        y0 + 0.035 * (ylim[1] - ylim[0]),
+        label,
+        ha="center",
+        va="bottom",
+        fontsize=fontsize,
+        color="black",
+        bbox=dict(facecolor="white", edgecolor="none", alpha=0.80, pad=1.0),
+        zorder=21,
     )
 
 
@@ -437,6 +492,22 @@ def expanded_map_bounds(bounds: np.ndarray, expansion: dict[str, float]) -> tupl
         xmax + width * expansion["extra_right"],
         ymax + height * expansion["extra_top"],
     )
+
+
+def build_zoom_bounds(bounds: np.ndarray, is_geographic: bool) -> tuple[float, float, float, float]:
+    xmin, ymin, xmax, ymax = bounds
+    cx = 0.5 * (xmin + xmax)
+    cy = 0.5 * (ymin + ymax)
+    half_size_m = 0.5 * ZOOM_WINDOW_SIZE_M
+
+    if is_geographic:
+        half_w = km_to_lon_degrees(half_size_m / 1000.0, cy)
+        half_h = km_to_lat_degrees(half_size_m / 1000.0)
+    else:
+        half_w = half_size_m
+        half_h = half_size_m
+
+    return cx - half_w, cy - half_h, cx + half_w, cy + half_h
 
 
 def main() -> None:
@@ -595,6 +666,100 @@ def main() -> None:
         spine.set_edgecolor(title_color)
 
     fig.subplots_adjust(**subplot_kwargs)
+
+    zoom_xmin, zoom_ymin, zoom_xmax, zoom_ymax = build_zoom_bounds(bounds, is_geographic)
+    zoom_extent = (zoom_xmin, zoom_xmax, zoom_ymin, zoom_ymax)
+    zoom_bounds = (zoom_xmin, zoom_ymin, zoom_xmax, zoom_ymax)
+    zoom_geom = box(zoom_xmin, zoom_ymin, zoom_xmax, zoom_ymax)
+    zoom_subset = parcels[parcels.intersects(zoom_geom)].copy()
+
+    zoom_rect = Rectangle(
+        (zoom_xmin, zoom_ymin),
+        zoom_xmax - zoom_xmin,
+        zoom_ymax - zoom_ymin,
+        facecolor="none",
+        edgecolor=ZOOM_CONNECTOR_COLOR,
+        linewidth=ZOOM_BOX_LINEWIDTH,
+        zorder=30,
+    )
+    ax.add_patch(zoom_rect)
+
+    ax_pos = ax.get_position()
+    zoom_left = ax_pos.x0 + ZOOM_INSET_X_FRAC * ax_pos.width
+    zoom_bottom = ax_pos.y0 + ZOOM_INSET_Y_FRAC * ax_pos.height
+    zoom_width = ZOOM_INSET_W_FRAC * ax_pos.width
+    zoom_height = ZOOM_INSET_H_FRAC * ax_pos.height
+
+    ax_zoom = fig.add_axes([zoom_left, zoom_bottom, zoom_width, zoom_height], facecolor=fig_bg)
+
+    for class_id in range(1, 11):
+        subset = zoom_subset[zoom_subset["lulc_class"] == class_id]
+        if subset.empty:
+            continue
+        subset.plot(
+            ax=ax_zoom,
+            facecolor=LULC_COLORS[class_id],
+            edgecolor=edge_color,
+            linewidth=0.28,
+            zorder=2,
+        )
+
+    nodata_zoom = zoom_subset[zoom_subset["lulc_class"] == CLASS_NODATA]
+    if not nodata_zoom.empty:
+        nodata_zoom.plot(
+            ax=ax_zoom,
+            facecolor="#D9D9D9",
+            edgecolor=edge_color,
+            linewidth=0.28,
+            zorder=1,
+        )
+
+    if not zoom_subset.empty:
+        zoom_subset.boundary.plot(ax=ax_zoom, color="#FFF9EF", linewidth=0.45, zorder=3)
+        zoom_subset.boundary.plot(ax=ax_zoom, color=edge_color, linewidth=0.18, zorder=4)
+
+    ax_zoom.set_xlim(zoom_xmin, zoom_xmax)
+    ax_zoom.set_ylim(zoom_ymin, zoom_ymax)
+    add_graticule(ax_zoom, color=grid_color, src_crs=raster_crs)
+    set_geographic_aspect(ax_zoom, zoom_bounds, raster_crs)
+    ax_zoom.set_xlabel("Longitude", fontsize=8, color=title_color, labelpad=1.5)
+    ax_zoom.set_ylabel("Latitude", fontsize=8, color=title_color, labelpad=1.5)
+    ax_zoom.tick_params(axis="both", labelsize=8, colors=title_color)
+    plt.setp(ax_zoom.get_xticklabels(), rotation=25, ha="right")
+
+    zoom_scalebar_length_m = choose_zoom_scalebar_length_m(ZOOM_WINDOW_SIZE_M * 0.45)
+    add_scalebar_1step(
+        ax_zoom,
+        length_m=zoom_scalebar_length_m,
+        location=(ZOOM_SCALEBAR_X_FRAC, ZOOM_SCALEBAR_Y_FRAC),
+        fontsize=7,
+        is_geographic=is_geographic,
+    )
+
+    for spine in ax_zoom.spines.values():
+        spine.set_linewidth(1.3)
+        spine.set_edgecolor(ZOOM_CONNECTOR_COLOR)
+
+    con1 = ConnectionPatch(
+        xyA=(zoom_xmax, zoom_ymax),
+        coordsA=ax.transData,
+        xyB=(zoom_xmin, zoom_ymax),
+        coordsB=ax_zoom.transData,
+        color=ZOOM_CONNECTOR_COLOR,
+        linewidth=1.1,
+        alpha=0.95,
+    )
+    con2 = ConnectionPatch(
+        xyA=(zoom_xmax, zoom_ymin),
+        coordsA=ax.transData,
+        xyB=(zoom_xmin, zoom_ymin),
+        coordsB=ax_zoom.transData,
+        color=ZOOM_CONNECTOR_COLOR,
+        linewidth=1.1,
+        alpha=0.95,
+    )
+    fig.add_artist(con1)
+    fig.add_artist(con2)
 
     output_png.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_png, dpi=FIG_DPI, facecolor=fig_bg, bbox_inches="tight", pad_inches=0.02)
