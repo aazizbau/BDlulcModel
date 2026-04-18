@@ -205,6 +205,32 @@ def sankey_patch(x0: float, x1: float, y0b: float, y0t: float, y1b: float, y1t: 
     return PathPatch(MplPath(verts, codes), facecolor=color, edgecolor="none", alpha=alpha)
 
 
+def adjust_positions(y_values: list[float], min_gap: float = 0.04, y_min: float = 0.02, y_max: float = 0.98) -> list[float]:
+    if not y_values:
+        return []
+
+    adjusted = sorted(max(y_min, min(y, y_max)) for y in y_values)
+
+    for i in range(1, len(adjusted)):
+        if adjusted[i] < adjusted[i - 1] + min_gap:
+            adjusted[i] = adjusted[i - 1] + min_gap
+
+    overflow = adjusted[-1] - y_max
+    if overflow > 0:
+        adjusted = [y - overflow for y in adjusted]
+
+    adjusted[0] = max(adjusted[0], y_min)
+    for i in range(1, len(adjusted)):
+        if adjusted[i] < adjusted[i - 1] + min_gap:
+            adjusted[i] = adjusted[i - 1] + min_gap
+
+    underflow = y_min - adjusted[0]
+    if underflow > 0:
+        adjusted = [y + underflow for y in adjusted]
+
+    return [max(y_min, min(y, y_max)) for y in adjusted]
+
+
 def save_sankey(df: pd.DataFrame, upazila: str, order: list[str], palette: dict) -> Path:
     trans = df.groupby(["lulc_name_2017", "lulc_name_2024"])[AREA_COL].sum().reset_index()
     total_area = trans[AREA_COL].sum()
@@ -262,21 +288,71 @@ def save_sankey(df: pd.DataFrame, upazila: str, order: list[str], palette: dict)
         right_cursor[dst] += h_right
         ax.add_patch(sankey_patch(x_flow0, x_flow1, y0b, y0t, y1b, y1t, color_for_class(dst)))
 
+    left_labels = []
+    right_labels = []
+
     for cls in order:
         yb, yt = left_pos[cls]
         ax.add_patch(Rectangle((x_left0, yb), x_left1 - x_left0, yt - yb, facecolor=color_for_class(cls), edgecolor="white", lw=0.7))
         pct = left_totals[cls] / total_area * 100 if total_area else 0
-        ax.text(x_left0 - 0.015, (yb + yt) / 2, f"{cls}\n{pct:.1f}%", ha="right", va="center", fontsize=9, color=palette["deep_slate"])
+        left_labels.append(
+            {
+                "cls": cls,
+                "y_center": (yb + yt) / 2,
+                "text": f"{cls} ({pct:.1f}%)",
+            }
+        )
 
     for cls in order:
         yb, yt = right_pos[cls]
         ax.add_patch(Rectangle((x_right0, yb), x_right1 - x_right0, yt - yb, facecolor=color_for_class(cls), edgecolor="white", lw=0.7))
         pct = right_totals[cls] / total_area * 100 if total_area else 0
-        ax.text(x_right1 + 0.015, (yb + yt) / 2, f"{cls}\n{pct:.1f}%", ha="left", va="center", fontsize=9, color=palette["deep_slate"])
+        right_labels.append(
+            {
+                "cls": cls,
+                "y_center": (yb + yt) / 2,
+                "text": f"{cls} ({pct:.1f}%)",
+            }
+        )
 
-    ax.text((x_left0 + x_left1) / 2, 1.035, "2017", ha="center", va="bottom", fontsize=12, fontweight="bold", color=palette["deep_slate"])
-    ax.text((x_right0 + x_right1) / 2, 1.035, "2024", ha="center", va="bottom", fontsize=12, fontweight="bold", color=palette["deep_slate"])
-    ax.set_title(f"{upazila.title()} parcel LULC transition flow (share of total area)", color=palette["deep_slate"])
+    left_labels = sorted(left_labels, key=lambda item: item["y_center"])
+    right_labels = sorted(right_labels, key=lambda item: item["y_center"])
+    adjusted_left = adjust_positions([item["y_center"] for item in left_labels], min_gap=0.04, y_min=0.02, y_max=0.98)
+    adjusted_right = adjust_positions([item["y_center"] for item in right_labels], min_gap=0.04, y_min=0.02, y_max=0.98)
+
+    for item, y_adj in zip(left_labels, adjusted_left):
+        y_orig = item["y_center"]
+        text_x = x_left0 - 0.015
+        connector_x0 = x_left0
+        connector_x1 = text_x + 0.003
+        if abs(y_adj - y_orig) > 0.002:
+            ax.plot(
+                [connector_x0, connector_x1],
+                [y_orig, y_adj],
+                color=palette["deep_slate"],
+                linewidth=0.7,
+                alpha=0.7,
+            )
+        ax.text(text_x, y_adj, item["text"], ha="right", va="center", fontsize=10, color=palette["deep_slate"])
+
+    for item, y_adj in zip(right_labels, adjusted_right):
+        y_orig = item["y_center"]
+        text_x = x_right1 + 0.015
+        connector_x0 = x_right1
+        connector_x1 = text_x - 0.003
+        if abs(y_adj - y_orig) > 0.002:
+            ax.plot(
+                [connector_x0, connector_x1],
+                [y_orig, y_adj],
+                color=palette["deep_slate"],
+                linewidth=0.7,
+                alpha=0.7,
+            )
+        ax.text(text_x, y_adj, item["text"], ha="left", va="center", fontsize=10, color=palette["deep_slate"])
+
+    ax.text((x_left0 + x_left1) / 2, 1.035, "2017", ha="center", va="bottom", fontsize=13, fontweight="bold", color=palette["deep_slate"])
+    ax.text((x_right0 + x_right1) / 2, 1.035, "2024", ha="center", va="bottom", fontsize=13, fontweight="bold", color=palette["deep_slate"])
+    ax.set_title(f"{upazila.title()} parcel LULC transition flow (share of total area)", fontsize=14, color=palette["deep_slate"])
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.02, 1.06)
     ax.axis("off")
