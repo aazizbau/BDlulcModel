@@ -174,6 +174,7 @@ def default_output_png(year: int, upazila: str) -> Path:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Assign parcel-level majority inferred LULC for an upazila.")
     p.add_argument("--year", type=int, required=True, help="Target year, e.g. 2017 or 2024.")
+    p.add_argument("--seed", type=int, default=42, help="Random seed for selecting the zoom box.")
     p.add_argument(
         "--upazila-parcels",
         required=True,
@@ -494,18 +495,34 @@ def expanded_map_bounds(bounds: np.ndarray, expansion: dict[str, float]) -> tupl
     )
 
 
-def build_zoom_bounds(bounds: np.ndarray, is_geographic: bool) -> tuple[float, float, float, float]:
+def build_zoom_bounds(bounds: np.ndarray, is_geographic: bool, seed: int) -> tuple[float, float, float, float]:
     xmin, ymin, xmax, ymax = bounds
-    cx = 0.5 * (xmin + xmax)
-    cy = 0.5 * (ymin + ymax)
     half_size_m = 0.5 * ZOOM_WINDOW_SIZE_M
 
     if is_geographic:
-        half_w = km_to_lon_degrees(half_size_m / 1000.0, cy)
+        mid_lat = 0.5 * (ymin + ymax)
+        half_w = km_to_lon_degrees(half_size_m / 1000.0, mid_lat)
         half_h = km_to_lat_degrees(half_size_m / 1000.0)
     else:
         half_w = half_size_m
         half_h = half_size_m
+
+    min_cx = xmin + half_w
+    max_cx = xmax - half_w
+    min_cy = ymin + half_h
+    max_cy = ymax - half_h
+
+    if max_cx <= min_cx:
+        cx = 0.5 * (xmin + xmax)
+    else:
+        rng = np.random.default_rng(seed)
+        cx = float(rng.uniform(min_cx, max_cx))
+
+    if max_cy <= min_cy:
+        cy = 0.5 * (ymin + ymax)
+    else:
+        rng = np.random.default_rng(seed + 1)
+        cy = float(rng.uniform(min_cy, max_cy))
 
     return cx - half_w, cy - half_h, cx + half_w, cy + half_h
 
@@ -667,7 +684,7 @@ def main() -> None:
 
     fig.subplots_adjust(**subplot_kwargs)
 
-    zoom_xmin, zoom_ymin, zoom_xmax, zoom_ymax = build_zoom_bounds(bounds, is_geographic)
+    zoom_xmin, zoom_ymin, zoom_xmax, zoom_ymax = build_zoom_bounds(bounds, is_geographic, args.seed)
     zoom_extent = (zoom_xmin, zoom_xmax, zoom_ymin, zoom_ymax)
     zoom_bounds = (zoom_xmin, zoom_ymin, zoom_xmax, zoom_ymax)
     zoom_geom = box(zoom_xmin, zoom_ymin, zoom_xmax, zoom_ymax)
