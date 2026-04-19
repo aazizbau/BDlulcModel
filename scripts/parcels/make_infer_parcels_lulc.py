@@ -16,39 +16,56 @@ Outputs
 
 Example
 -------
-python scripts/parcels/make_infer_parcels_lulc.py \
+python scripts/parcels/make_infer_parcels_lulc.py
     --year 2017 \
-    --upazila-parcels bamna
+    --seed 42 \
+    --upazila-parcels bamna \
+    --scalebar-x-frac 0.15 \
+    --scalebar-y-frac -0.05 \
+    --north-arrow-x-frac 1.3 \
+    --north-arrow-y-frac 0.90 \
+    --legend-x-frac 1.68 \
+    --legend-y-frac -0.05 \
+    --zoom-inset-x-frac 0.68 \
+    --zoom-inset-y-frac 0.52
 
 python scripts/parcels/make_infer_parcels_lulc.py \
     --year 2017 \
+    --seed 42 \
     --upazila-parcels amtali \
     --scalebar-x-frac 0.07 \
     --scalebar-y-frac -0.05 \
     --north-arrow-x-frac 0.97 \
     --north-arrow-y-frac 0.90 \
     --legend-x-frac 1.05 \
-    --legend-y-frac -0.06
+    --legend-y-frac -0.06 \
+    --zoom-inset-x-frac 0.15 \
+    --zoom-inset-y-frac 0.60
 
 python scripts/parcels/make_infer_parcels_lulc.py \
     --year 2017 \
     --upazila-parcels betagi \
     --scalebar-x-frac 0.15 \
     --scalebar-y-frac -0.05 \
-    --north-arrow-x-frac 1.0 \
+    --north-arrow-x-frac 1.3 \
     --north-arrow-y-frac 0.90 \
-    --legend-x-frac 1.28 \
-    --legend-y-frac 0.00
+    --legend-x-frac 1.40 \
+    --legend-y-frac -0.05 \
+    --zoom-inset-x-frac 0.60 \
+    --zoom-inset-y-frac 0.42
 		
 python scripts/parcels/make_infer_parcels_lulc.py \
     --year 2017 \
+    --seed 42 \
     --upazila-parcels manpura \
     --scalebar-x-frac 0.15 \
     --scalebar-y-frac -0.05 \
     --north-arrow-x-frac 1.3 \
     --north-arrow-y-frac 0.90 \
     --legend-x-frac 1.68 \
-    --legend-y-frac -0.05
+    --legend-y-frac -0.05 \
+    --zoom-inset-x-frac 0.70 \
+    --zoom-inset-y-frac 0.52
 """
 
 from __future__ import annotations
@@ -213,6 +230,22 @@ def decimal_to_dm(value: float, kind: str) -> str:
     return f"{d}°{m:02d}′{hemi}"
 
 
+def decimal_to_dms(value: float, kind: str) -> str:
+    hemi = "E" if kind == "lon" and value >= 0 else "W" if kind == "lon" else "N" if value >= 0 else "S"
+    deg_abs = abs(value)
+    d = int(deg_abs)
+    minutes_total = (deg_abs - d) * 60.0
+    m = int(minutes_total)
+    s = int(round((minutes_total - m) * 60.0))
+    if s == 60:
+        m += 1
+        s = 0
+    if m == 60:
+        d += 1
+        m = 0
+    return f"{d}°{m:02d}′{s:02d}″{hemi}"
+
+
 def km_to_lon_degrees(km: float, lat_deg: float) -> float:
     cos_lat = np.cos(np.deg2rad(lat_deg))
     if abs(cos_lat) < 1e-8:
@@ -249,6 +282,25 @@ def add_graticule(ax, color: str, src_crs) -> None:
         label.set_rotation(90)
         label.set_va("center")
         label.set_ha("center")
+
+
+def apply_zoom_graticule_dms(ax, src_crs) -> None:
+    src_crs = CRS.from_user_input(src_crs)
+    dst_crs = CRS.from_epsg(4326)
+    transformer = Transformer.from_crs(src_crs, dst_crs, always_xy=True)
+
+    def fmt_x(x, _pos=None):
+        y_mid = 0.5 * sum(ax.get_ylim())
+        lon, _ = transformer.transform(x, y_mid)
+        return decimal_to_dms(lon, "lon")
+
+    def fmt_y(y, _pos=None):
+        x_mid = 0.5 * sum(ax.get_xlim())
+        _, lat = transformer.transform(x_mid, y)
+        return decimal_to_dms(lat, "lat")
+
+    ax.xaxis.set_major_formatter(FuncFormatter(fmt_x))
+    ax.yaxis.set_major_formatter(FuncFormatter(fmt_y))
 
 
 def format_scalebar_value(value: float) -> str:
@@ -742,6 +794,7 @@ def main() -> None:
     ax_zoom.set_xlim(zoom_xmin, zoom_xmax)
     ax_zoom.set_ylim(zoom_ymin, zoom_ymax)
     add_graticule(ax_zoom, color=grid_color, src_crs=raster_crs)
+    apply_zoom_graticule_dms(ax_zoom, raster_crs)
     set_geographic_aspect(ax_zoom, zoom_bounds, raster_crs)
     ax_zoom.set_xlabel("Longitude", fontsize=8, color=title_color, labelpad=1.5)
     ax_zoom.set_ylabel("Latitude", fontsize=8, color=title_color, labelpad=1.5)
@@ -762,10 +815,17 @@ def main() -> None:
         spine.set_linewidth(1.3)
         spine.set_edgecolor(ZOOM_CONNECTOR_COLOR)
 
+    if args.upazila_parcels == "amtali":
+        zoom_connector_top = (zoom_xmax, zoom_ymax)
+        zoom_connector_bottom = (zoom_xmax, zoom_ymin)
+    else:
+        zoom_connector_top = (zoom_xmin, zoom_ymax)
+        zoom_connector_bottom = (zoom_xmin, zoom_ymin)
+
     con1 = ConnectionPatch(
         xyA=(zoom_xmax, zoom_ymax),
         coordsA=ax.transData,
-        xyB=(zoom_xmin, zoom_ymax),
+        xyB=zoom_connector_top,
         coordsB=ax_zoom.transData,
         color=ZOOM_CONNECTOR_COLOR,
         linewidth=1.1,
@@ -774,7 +834,7 @@ def main() -> None:
     con2 = ConnectionPatch(
         xyA=(zoom_xmax, zoom_ymin),
         coordsA=ax.transData,
-        xyB=(zoom_xmin, zoom_ymin),
+        xyB=zoom_connector_bottom,
         coordsB=ax_zoom.transData,
         color=ZOOM_CONNECTOR_COLOR,
         linewidth=1.1,
