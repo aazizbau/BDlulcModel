@@ -193,6 +193,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--north-arrow-y-frac", type=float, default=NORTH_ARROW_Y_FRAC, help="North arrow y position in axes fraction.")
     p.add_argument("--legend-x-frac", type=float, default=LEGEND_X_FRAC, help="Legend x position in axes fraction.")
     p.add_argument("--legend-y-frac", type=float, default=LEGEND_Y_FRAC, help="Legend y position in axes fraction.")
+    p.add_argument("--zoom-inset-x-frac", type=float, default=ZOOM_INSET_X_FRAC, help="Zoom inset x position in axes fraction.")
+    p.add_argument("--zoom-inset-y-frac", type=float, default=ZOOM_INSET_Y_FRAC, help="Zoom inset y position in axes fraction.")
     return p.parse_args()
 
 
@@ -541,6 +543,8 @@ def main() -> None:
     north_arrow_y_frac = args.north_arrow_y_frac
     legend_x_frac = args.legend_x_frac
     legend_y_frac = args.legend_y_frac
+    zoom_inset_x_frac = args.zoom_inset_x_frac
+    zoom_inset_y_frac = args.zoom_inset_y_frac
 
     palette = load_palette(palette_path)
     colors = palette["colors"]
@@ -702,8 +706,8 @@ def main() -> None:
     ax.add_patch(zoom_rect)
 
     ax_pos = ax.get_position()
-    zoom_left = ax_pos.x0 + ZOOM_INSET_X_FRAC * ax_pos.width
-    zoom_bottom = ax_pos.y0 + ZOOM_INSET_Y_FRAC * ax_pos.height
+    zoom_left = ax_pos.x0 + zoom_inset_x_frac * ax_pos.width
+    zoom_bottom = ax_pos.y0 + zoom_inset_y_frac * ax_pos.height
     zoom_width = ZOOM_INSET_W_FRAC * ax_pos.width
     zoom_height = ZOOM_INSET_H_FRAC * ax_pos.height
 
@@ -743,6 +747,7 @@ def main() -> None:
     ax_zoom.set_ylabel("Latitude", fontsize=8, color=title_color, labelpad=1.5)
     ax_zoom.tick_params(axis="both", labelsize=8, colors=title_color)
     plt.setp(ax_zoom.get_xticklabels(), rotation=25, ha="right")
+    plt.setp(ax_zoom.get_yticklabels(), rotation=0, ha="right", va="center")
 
     zoom_scalebar_length_m = choose_zoom_scalebar_length_m(ZOOM_WINDOW_SIZE_M * 0.45)
     add_scalebar_1step(
