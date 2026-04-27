@@ -7,6 +7,7 @@ Inputs
 ------
 - outputs/inference/change_analysis/transition_code_2017_to_2024.tif
 - assets/maps/bd_coastal_zones.gpkg
+- assets/maps/sundarbans.gpkg
 - assets/maps/NorthArrow.svg
 - assets/color_palette_coastal_lulc.json
 
@@ -62,6 +63,7 @@ JST = timezone(timedelta(hours=9))
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INPUT = Path("outputs/inference/change_analysis/transition_code_2017_to_2024.tif")
 DEFAULT_ZONE_MAP = Path("assets/maps/bd_coastal_zones.gpkg")
+DEFAULT_SUNDARBANS_MAP = Path("assets/maps/sundarbans.gpkg")
 DEFAULT_NORTH_ARROW = Path("assets/maps/NorthArrow.svg")
 DEFAULT_PALETTE = Path("assets/color_palette_coastal_lulc.json")
 DEFAULT_OUTDIR = Path("outputs/figures")
@@ -90,6 +92,10 @@ ZONE_LABELS = {
     "western": "Western Zone",
     "central": "Central Zone",
     "eastern": "Eastern Zone",
+}
+
+ZONE_LABEL_OFFSETS = {
+    "western": (0.0, 26000.0),
 }
 
 MAP_SPECS = {
@@ -142,6 +148,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create six separate three-class LULC transition focus maps.")
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT, help="Input transition raster.")
     parser.add_argument("--zone-map", type=Path, default=DEFAULT_ZONE_MAP, help="Coastal zones vector layer.")
+    parser.add_argument("--sundarbans-map", type=Path, default=DEFAULT_SUNDARBANS_MAP, help="Sundarbans vector layer.")
     parser.add_argument("--north-arrow", type=Path, default=DEFAULT_NORTH_ARROW, help="North arrow SVG path.")
     parser.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
     parser.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR, help="Directory for output PNG and JSON files.")
@@ -516,6 +523,8 @@ def render_single(
     zone_text_color: str,
     bay_text_color: str,
     legend_face: str,
+    sundarbans: gpd.GeoDataFrame,
+    sundarbans_text_color: str,
 ) -> None:
     rgb = render_rgb(arr, focus_color=focus_color, sea_color=sea_color)
 
@@ -531,6 +540,7 @@ def render_single(
     )
 
     zones.boundary.plot(ax=ax, color=zone_edge, linewidth=1.4, zorder=4)
+    sundarbans.boundary.plot(ax=ax, color=zone_edge, linewidth=1.4, zorder=5)
 
     for _, row in zones.iterrows():
         geom = row.geometry
@@ -539,15 +549,35 @@ def render_single(
         zone_key = str(row[zone_field]).strip().lower()
         label = ZONE_LABELS.get(zone_key, zone_key.title())
         pt = geom.representative_point()
+        dx, dy = ZONE_LABEL_OFFSETS.get(zone_key, (0.0, 0.0))
         txt = ax.text(
-            pt.x,
-            pt.y,
+            pt.x + dx,
+            pt.y + dy,
             label,
             fontsize=12,
             fontweight="bold",
             ha="center",
             va="center",
             color=zone_text_color,
+            zorder=6,
+        )
+        txt.set_path_effects([pe.Stroke(linewidth=3, foreground=fig_bg), pe.Normal()])
+
+    for _, row in sundarbans.iterrows():
+        geom = row.geometry
+        if geom is None or geom.is_empty:
+            continue
+        label = str(row["zone"]).strip()
+        pt = geom.representative_point()
+        txt = ax.text(
+            pt.x,
+            pt.y,
+            label,
+            fontsize=10,
+            fontweight="bold",
+            ha="center",
+            va="center",
+            color=sundarbans_text_color,
             zorder=6,
         )
         txt.set_path_effects([pe.Stroke(linewidth=3, foreground=fig_bg), pe.Normal()])
@@ -613,6 +643,7 @@ def main() -> None:
     args = parse_args()
     input_path = resolve_path(args.input)
     zone_map = resolve_path(args.zone_map)
+    sundarbans_map = resolve_path(args.sundarbans_map)
     north_arrow = resolve_path(args.north_arrow)
     palette_path = resolve_path(args.palette)
     outdir = resolve_path(args.outdir)
@@ -627,6 +658,7 @@ def main() -> None:
     zone_edge = "#2b2e07"
     main_text_color = colors["deep_slate"]
     zone_text_color = colors["coral"]
+    sundarbans_text_color = colors["deep_slate"]
     bay_text_color = colors["teal_blue"]
     legend_face = "#FFF9EF"
 
@@ -648,6 +680,13 @@ def main() -> None:
         raise ValueError("Zone map has no CRS.")
     zones = zones.to_crs(raster_crs)
     zone_field = choose_zone_field(zones)
+
+    sundarbans = gpd.read_file(sundarbans_map)
+    if sundarbans.empty:
+        raise ValueError("Sundarbans vector is empty.")
+    if sundarbans.crs is None:
+        raise ValueError("Sundarbans vector has no CRS.")
+    sundarbans = sundarbans.to_crs(raster_crs)
     zone_records = build_zone_records(zones, zone_field)
     zone_shapes = [(record["geometry"], int(record["zone_id"])) for record in zone_records]
     zone_counters = {
@@ -727,6 +766,8 @@ def main() -> None:
             zone_text_color=zone_text_color,
             bay_text_color=bay_text_color,
             legend_face=legend_face,
+            sundarbans=sundarbans,
+            sundarbans_text_color=sundarbans_text_color,
         )
         stats = compute_stats_from_counter(stats_counters[key], px_area_km2, spec["label"])
         json_path.write_text(json.dumps(stats, indent=2), encoding="utf-8")
