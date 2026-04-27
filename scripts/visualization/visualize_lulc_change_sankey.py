@@ -104,6 +104,10 @@ OUTPUT_NAMES = {
     "eastern": "lulc_change_2017vs2024_sankey_eastern_zone.png",
 }
 
+TITLE_FONTSIZE = 20        # chart title
+YEAR_LABEL_FONTSIZE = 18   # "2017" / "2024" column headers
+CLASS_LABEL_FONTSIZE = 10 # per-class labels on left and right sides
+
 
 def resolve_path(path: Path) -> Path:
     return path if path.is_absolute() else PROJECT_ROOT / path
@@ -322,7 +326,7 @@ def save_sankey(
         if abs(ya - y_orig) > 0.002:
             ax.plot([xl0, tx + 0.003], [y_orig, ya], color=tc, lw=0.6, alpha=0.55)
         ax.text(tx, ya, item["text"], ha="right", va="center",
-                fontsize=8.5, color=tc, linespacing=1.35, zorder=3)
+                fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
 
     for item, ya in zip(ritems, ar):
         y_orig = item["yc"]
@@ -330,13 +334,13 @@ def save_sankey(
         if abs(ya - y_orig) > 0.002:
             ax.plot([xr1, tx - 0.003], [y_orig, ya], color=tc, lw=0.6, alpha=0.55)
         ax.text(tx, ya, item["text"], ha="left", va="center",
-                fontsize=8.5, color=tc, linespacing=1.35, zorder=3)
+                fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
 
     ax.text((xl0 + xl1) / 2, 1.050, "2017",
-            ha="center", va="bottom", fontsize=14, fontweight="bold", color=tc)
+            ha="center", va="bottom", fontsize=YEAR_LABEL_FONTSIZE, fontweight="bold", color=tc)
     ax.text((xr0 + xr1) / 2, 1.050, "2024",
-            ha="center", va="bottom", fontsize=14, fontweight="bold", color=tc)
-    ax.set_title(title, fontsize=14, color=tc, pad=24)
+            ha="center", va="bottom", fontsize=YEAR_LABEL_FONTSIZE, fontweight="bold", color=tc)
+    ax.set_title(title, fontsize=TITLE_FONTSIZE, color=tc, pad=24)
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.04, 1.12)
     ax.axis("off")
