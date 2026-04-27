@@ -162,6 +162,17 @@ def calculate_metrics_for_run(test_data):
     }
 
 
+def clean_feature_set_name(name):
+    if pd.isna(name):
+        return name
+    s = str(name).strip()
+    mapping = {
+        "ae64":               "AE64",
+        "ae64_plus10indices": "AE64_plus10indices",
+    }
+    return mapping.get(s.lower(), s)
+
+
 def wrap_label(text, width=16):
     return "\n".join(textwrap.wrap(str(text), width=width))
 
@@ -184,13 +195,14 @@ if test_all.empty:
     raise ValueError("No rows found for split == 'test'.")
 
 test_all["model_family_clean"] = test_all["model_family"].apply(clean_family_name)
+test_all["feature_set_clean"]  = test_all["feature_set"].apply(clean_feature_set_name)
 
 print("Available model families in test split:")
 for fam in sorted(test_all["model_family_clean"].dropna().unique()):
     print(f"  - {fam}")
 
 print("\nAvailable feature sets in test split:")
-for fs in sorted(test_all["feature_set"].dropna().unique()):
+for fs in sorted(test_all["feature_set_clean"].dropna().unique()):
     print(f"  - {fs}")
 
 
@@ -204,7 +216,7 @@ for family in MODEL_FAMILY_ORDER:
         continue
 
     for feature_set in FEATURE_SETS:
-        fs_data = fam_data[fam_data["feature_set"] == feature_set].copy()
+        fs_data = fam_data[fam_data["feature_set_clean"] == feature_set].copy()
         if fs_data.empty:
             print(f"Warning: No test data found for {family} / {feature_set}")
             continue
