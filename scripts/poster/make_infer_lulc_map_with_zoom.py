@@ -29,6 +29,14 @@ python scripts/poster/make_infer_lulc_map_with_zoom.py \
     --zoom-window-km 40 \
     --zoom-inset-x-frac 0.60 \
     --zoom-inset-y-frac 0.48
+
+Best View
+python scripts/poster/make_infer_lulc_map_with_zoom.py \
+    --year 2017 \
+    --seed 38 \
+    --zoom-window-km 5 \
+    --zoom-inset-x-frac 0.49 \
+    --zoom-inset-y-frac 0.075
 """
 
 from __future__ import annotations
@@ -76,12 +84,12 @@ LONGITUDE_LABEL_PAD = 0
 TIGHT_LAYOUT_BOTTOM = -0.04
 CLASS_NODATA = 0
 MAP_TITLE_TEMPLATE = "Bangladesh Coastal LULC {year}"
-BAY_LABEL_X_FRAC = 0.25
-BAY_LABEL_Y_FRAC = 0.25
-SCALEBAR_X_FRAC = 0.02
-SCALEBAR_Y_FRAC = 0.03
-LEGEND_X_FRAC = 0.42
-LEGEND_Y_FRAC = 0.085
+BAY_LABEL_X_FRAC = 0.38
+BAY_LABEL_Y_FRAC = 0.03
+SCALEBAR_X_FRAC = 0.52
+SCALEBAR_Y_FRAC = 0.005
+LEGEND_X_FRAC = 0.035
+LEGEND_Y_FRAC = 0.05
 LEGEND_FONTSIZE = 10
 LEGEND_HANDLE_LENGTH = 1.9
 LEGEND_HANDLE_HEIGHT = 1.3
@@ -94,8 +102,8 @@ ZOOM_INSET_X_FRAC = 0.55
 ZOOM_INSET_Y_FRAC = 0.50
 ZOOM_INSET_W_FRAC = 0.35
 ZOOM_INSET_H_FRAC = 0.35
-ZOOM_SCALEBAR_X_FRAC = 0.10
-ZOOM_SCALEBAR_Y_FRAC = 0.08
+ZOOM_SCALEBAR_X_FRAC = 0.05
+ZOOM_SCALEBAR_Y_FRAC = 0.05
 ZOOM_CONNECTOR_COLOR = "#D62828"
 ZOOM_BOX_LINEWIDTH = 1.5
 ZOOM_MAX_RASTER_SIZE = 800
@@ -667,8 +675,8 @@ def main() -> None:
     ax_zoom.set_xlabel("Longitude", fontsize=8, color=main_text_color, labelpad=1.5)
     ax_zoom.set_ylabel("Latitude", fontsize=8, color=main_text_color, labelpad=1.5)
     ax_zoom.tick_params(axis="both", labelsize=7, colors=main_text_color)
-    plt.setp(ax_zoom.get_xticklabels(), rotation=25, ha="right")
-    plt.setp(ax_zoom.get_yticklabels(), rotation=0, ha="right", va="center")
+    plt.setp(ax_zoom.get_xticklabels(), rotation=0, ha="center")
+    plt.setp(ax_zoom.get_yticklabels(), rotation=90, ha="center", va="center")
 
     zoom_scalebar_km = choose_zoom_scalebar_length_km(zoom_window_km)
     add_scalebar_zoom(
@@ -683,9 +691,9 @@ def main() -> None:
         spine.set_linewidth(1.3)
         spine.set_edgecolor(ZOOM_CONNECTOR_COLOR)
 
-    # Connector lines from right edge of zoom rectangle to zoom inset
+    # Connector lines: inset upper-right → map box lower-right, inset upper-left → map box lower-left
     con1 = ConnectionPatch(
-        xyA=(zoom_xmax, zoom_ymax),
+        xyA=(zoom_xmax, zoom_ymin),
         coordsA=ax.transData,
         xyB=(zoom_xmax, zoom_ymax),
         coordsB=ax_zoom.transData,
@@ -694,9 +702,9 @@ def main() -> None:
         alpha=0.95,
     )
     con2 = ConnectionPatch(
-        xyA=(zoom_xmax, zoom_ymin),
+        xyA=(zoom_xmin, zoom_ymin),
         coordsA=ax.transData,
-        xyB=(zoom_xmax, zoom_ymin),
+        xyB=(zoom_xmin, zoom_ymax),
         coordsB=ax_zoom.transData,
         color=ZOOM_CONNECTOR_COLOR,
         linewidth=1.1,
