@@ -329,7 +329,6 @@ def main() -> None:
     fig_bg = colors["sand"]
     sea_color = colors["mist_gray"]
     grid_color = colors["deep_slate"]
-    zone_edge = "#2b2e07"
     main_text_color = colors["deep_slate"]
     zone_text_color = colors["coral"]
     sundarbans_text_color = colors["deep_slate"]
@@ -375,8 +374,13 @@ def main() -> None:
         zorder=1,
     )
 
-    zones.boundary.plot(ax=ax, color=zone_edge, linewidth=1.4, zorder=4)
-    sundarbans.boundary.plot(ax=ax, color=zone_edge, linewidth=1.4, zorder=5)
+    # Zone boundaries: black halo + bright gold line
+    zones.boundary.plot(ax=ax, color="black", linewidth=2.0, zorder=4, alpha=0.6)
+    zones.boundary.plot(ax=ax, color="#FFD700", linewidth=0.7, zorder=4)
+
+    # Sundarbans boundary: black halo + bright gold line
+    sundarbans.boundary.plot(ax=ax, color="black", linewidth=2.0, zorder=5, alpha=0.6)
+    sundarbans.boundary.plot(ax=ax, color="#FFD700", linewidth=0.7, zorder=5)
 
     for _, row in zones.iterrows():
         geom = row.geometry
