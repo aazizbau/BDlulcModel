@@ -222,7 +222,9 @@ def save_sankey(
     right_totals = df.groupby("class_2024")["area_km2"].sum()
 
     gap = 0.022
-    total_gap = gap * max(0, len(order) - 1)
+    EXTRA_GAP_AFTER = {8: 0.055}  # extra gap between Rivers/Channels (8) and Mangrove Forest (9)
+    extra_gap_total = sum(EXTRA_GAP_AFTER.values())
+    total_gap = gap * max(0, len(order) - 1) + extra_gap_total
     MIN_BAR_H = 0.016  # minimum bar height in axes fraction for readability
 
     left_sum_frac = left_totals.reindex(order, fill_value=0.0).sum() / total
@@ -242,13 +244,15 @@ def save_sankey(
     lpos: dict[int, tuple[float, float]] = {}
     rpos: dict[int, tuple[float, float]] = {}
     y = 1.0
-    for c in order:
+    for i, c in enumerate(order):
         lpos[c] = (y - lh[c], y)
-        y -= lh[c] + gap
+        extra = EXTRA_GAP_AFTER.get(c, 0.0) if i < len(order) - 1 else 0.0
+        y -= lh[c] + gap + extra
     y = 1.0
-    for c in order:
+    for i, c in enumerate(order):
         rpos[c] = (y - rh[c], y)
-        y -= rh[c] + gap
+        extra = EXTRA_GAP_AFTER.get(c, 0.0) if i < len(order) - 1 else 0.0
+        y -= rh[c] + gap + extra
 
     lcur = {c: lpos[c][0] for c in order}
     rcur = {c: rpos[c][0] for c in order}
@@ -264,8 +268,10 @@ def save_sankey(
 
     for _, row in df.sort_values(["class_2017", "class_2024"]).iterrows():
         s, d = row["class_2017"], row["class_2024"]
-        frac = row["area_km2"] / total
-        hl, hr = frac * sl, frac * sr
+        area_sd = row["area_km2"]
+        # Scale flows to bar height so they fill bars exactly (bars may be boosted)
+        hl = lh[s] * area_sd / max(left_totals.get(s, 0.0), 1e-12)
+        hr = rh[d] * area_sd / max(right_totals.get(d, 0.0), 1e-12)
         ax.add_patch(
             _sankey_patch(xl1, xr0, lcur[s], lcur[s] + hl, rcur[d], rcur[d] + hr, LULC_COLORS[d])
         )
@@ -298,23 +304,36 @@ def save_sankey(
         key=lambda x: x["yc"],
     )
 
-    al = _adjust_positions([it["yc"] for it in litems], min_gap=0.058)
-    ar = _adjust_positions([it["yc"] for it in ritems], min_gap=0.058)
+    # Classes 9 (Mangrove Forest) and 10 (Bare/Exposed Land) are large enough to
+    # place labels directly at the bar centre with no connector line.
+    NO_CONNECTOR = {9, 10}
 
-    for item, ya in zip(litems, al):
+    litems_adj = [it for it in litems if it["c"] not in NO_CONNECTOR]
+    litems_fixed = [it for it in litems if it["c"] in NO_CONNECTOR]
+    al = _adjust_positions([it["yc"] for it in litems_adj], min_gap=0.058)
+    for item, ya in zip(litems_adj, al):
         y_orig = item["yc"]
         tx = xl0 - 0.012
         if abs(ya - y_orig) > 0.002:
             ax.plot([xl0, tx + 0.003], [y_orig, ya], color=tc, lw=0.6, alpha=0.55)
         ax.text(tx, ya, item["text"], ha="right", va="center",
                 fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
+    for item in litems_fixed:
+        ax.text(xl0 - 0.012, item["yc"], item["text"], ha="right", va="center",
+                fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
 
-    for item, ya in zip(ritems, ar):
+    ritems_adj = [it for it in ritems if it["c"] not in NO_CONNECTOR]
+    ritems_fixed = [it for it in ritems if it["c"] in NO_CONNECTOR]
+    ar = _adjust_positions([it["yc"] for it in ritems_adj], min_gap=0.058)
+    for item, ya in zip(ritems_adj, ar):
         y_orig = item["yc"]
         tx = xr1 + 0.012
         if abs(ya - y_orig) > 0.002:
             ax.plot([xr1, tx - 0.003], [y_orig, ya], color=tc, lw=0.6, alpha=0.55)
         ax.text(tx, ya, item["text"], ha="left", va="center",
+                fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
+    for item in ritems_fixed:
+        ax.text(xr1 + 0.012, item["yc"], item["text"], ha="left", va="center",
                 fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
 
     ax.text((xl0 + xl1) / 2, 1.050, "2017",
