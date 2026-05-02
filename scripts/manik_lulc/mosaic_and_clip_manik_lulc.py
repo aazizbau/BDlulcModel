@@ -107,10 +107,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def list_tiles(input_dir: Path, pattern: str) -> list[Path]:
-    paths = sorted(input_dir.glob(pattern))
+    paths = sorted(input_dir.rglob(pattern))
     if not paths:
         raise FileNotFoundError(
-            f'No Manik LULC tiles found in "{input_dir}" matching pattern "{pattern}".'
+            f'No Manik LULC tiles found in "{input_dir}" (searched recursively) matching pattern "{pattern}".'
         )
     return paths
 
