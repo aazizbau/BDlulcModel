@@ -221,16 +221,23 @@ def save_sankey(
     left_totals = df.groupby("class_2017")["area_km2"].sum()
     right_totals = df.groupby("class_2024")["area_km2"].sum()
 
-    gap = 0.010
+    gap = 0.022
     total_gap = gap * max(0, len(order) - 1)
+    MIN_BAR_H = 0.016  # minimum bar height in axes fraction for readability
 
     left_sum_frac = left_totals.reindex(order, fill_value=0.0).sum() / total
     right_sum_frac = right_totals.reindex(order, fill_value=0.0).sum() / total
     sl = (1.0 - total_gap) / max(left_sum_frac, 1e-12)
     sr = (1.0 - total_gap) / max(right_sum_frac, 1e-12)
 
-    lh = {c: (left_totals.get(c, 0.0) / total) * sl for c in order}
-    rh = {c: (right_totals.get(c, 0.0) / total) * sr for c in order}
+    def _bar_heights(totals_series: pd.Series, scale: float) -> dict[int, float]:
+        raw = {c: (totals_series.get(c, 0.0) / total) * scale for c in order}
+        boosted = {c: max(v, MIN_BAR_H) for c, v in raw.items()}
+        rescale = (1.0 - total_gap) / max(sum(boosted.values()), 1e-12)
+        return {c: v * rescale for c, v in boosted.items()}
+
+    lh = _bar_heights(left_totals, sl)
+    rh = _bar_heights(right_totals, sr)
 
     lpos: dict[int, tuple[float, float]] = {}
     rpos: dict[int, tuple[float, float]] = {}
@@ -291,8 +298,8 @@ def save_sankey(
         key=lambda x: x["yc"],
     )
 
-    al = _adjust_positions([it["yc"] for it in litems])
-    ar = _adjust_positions([it["yc"] for it in ritems])
+    al = _adjust_positions([it["yc"] for it in litems], min_gap=0.058)
+    ar = _adjust_positions([it["yc"] for it in ritems], min_gap=0.058)
 
     for item, ya in zip(litems, al):
         y_orig = item["yc"]
