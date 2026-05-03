@@ -315,7 +315,7 @@ def save_sankey(
         y_orig = item["yc"]
         tx = xl0 - 0.012
         if abs(ya - y_orig) > 0.002:
-            ax.plot([xl0, tx + 0.003], [y_orig, ya], color=tc, lw=0.6, alpha=0.55)
+            ax.plot([xl0, tx + 0.003], [y_orig, ya], color=LULC_COLORS[item["c"]], lw=1.2, alpha=0.75)
         ax.text(tx, ya, item["text"], ha="right", va="center",
                 fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
     for item in litems_fixed:
@@ -329,7 +329,7 @@ def save_sankey(
         y_orig = item["yc"]
         tx = xr1 + 0.012
         if abs(ya - y_orig) > 0.002:
-            ax.plot([xr1, tx - 0.003], [y_orig, ya], color=tc, lw=0.6, alpha=0.55)
+            ax.plot([xr1, tx - 0.003], [y_orig, ya], color=LULC_COLORS[item["c"]], lw=1.2, alpha=0.75)
         ax.text(tx, ya, item["text"], ha="left", va="center",
                 fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
     for item in ritems_fixed:
