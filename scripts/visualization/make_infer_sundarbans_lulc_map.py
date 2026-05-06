@@ -17,6 +17,8 @@ Example
 -------
 python scripts/visualization/make_infer_sundarbans_lulc_map.py --year 2017
 python scripts/visualization/make_infer_sundarbans_lulc_map.py --year 2024
+python scripts/visualization/make_infer_sundarbans_lulc_map.py --year 2017 \
+    --buffer-top 1000 --buffer-bottom 10000 --buffer-left 10000 --buffer-right 10000
 """
 
 from __future__ import annotations
@@ -64,8 +66,12 @@ TIGHT_LAYOUT_BOTTOM = -0.04
 CLASS_NODATA = 0
 MAP_TITLE_TEMPLATE = "Sundarbans LULC {year}"
 
-# Buffer around the Sundarbans polygon in the raster CRS units (metres for UTM)
-EXTENT_BUFFER_M = 8000
+# Per-side buffer around the Sundarbans polygon in raster CRS units (metres for UTM).
+# Top is kept small so the map does not extend far north into land.
+BUFFER_TOP_M    = 1000
+BUFFER_BOTTOM_M = 10000
+BUFFER_LEFT_M   = 10000
+BUFFER_RIGHT_M  = 10000
 
 # Scale bar — 25 km suits the ~100 km Sundarbans extent
 SCALEBAR_LENGTH_KM = 25
@@ -134,8 +140,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--north-arrow", type=Path, default=DEFAULT_NORTH_ARROW, help="North arrow SVG path.")
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
     p.add_argument("--output", type=Path, default=None, help="Output PNG path.")
-    p.add_argument("--buffer-m", type=float, default=EXTENT_BUFFER_M,
-                   help="Buffer around Sundarbans polygon in raster CRS units (metres). Default: 8000.")
+    p.add_argument("--buffer-top", type=float, default=BUFFER_TOP_M,
+                   help="Buffer north of Sundarbans in metres. Default: 1000.")
+    p.add_argument("--buffer-bottom", type=float, default=BUFFER_BOTTOM_M,
+                   help="Buffer south of Sundarbans in metres (Bay of Bengal). Default: 10000.")
+    p.add_argument("--buffer-left", type=float, default=BUFFER_LEFT_M,
+                   help="Buffer west of Sundarbans in metres. Default: 10000.")
+    p.add_argument("--buffer-right", type=float, default=BUFFER_RIGHT_M,
+                   help="Buffer east of Sundarbans in metres. Default: 10000.")
     return p.parse_args()
 
 
@@ -348,11 +360,10 @@ def main() -> None:
         # Reproject Sundarbans to raster CRS and compute clip extent with buffer
         sundarbans = sundarbans_wgs84.to_crs(raster_crs)
         sb_bounds = sundarbans.total_bounds  # [minx, miny, maxx, maxy]
-        buf = args.buffer_m
-        clip_left   = sb_bounds[0] - buf
-        clip_bottom = sb_bounds[1] - buf
-        clip_right  = sb_bounds[2] + buf
-        clip_top    = sb_bounds[3] + buf
+        clip_left   = sb_bounds[0] - args.buffer_left
+        clip_bottom = sb_bounds[1] - args.buffer_bottom
+        clip_right  = sb_bounds[2] + args.buffer_right
+        clip_top    = sb_bounds[3] + args.buffer_top
 
         classes, actual_bounds = read_clipped_class_raster(
             ds,
