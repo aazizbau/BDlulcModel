@@ -19,6 +19,9 @@ python scripts/visualization/make_infer_sundarbans_lulc_map.py --year 2017
 python scripts/visualization/make_infer_sundarbans_lulc_map.py --year 2024
 python scripts/visualization/make_infer_sundarbans_lulc_map.py --year 2017 \
     --buffer-top 1000 --buffer-bottom 10000 --buffer-left 10000 --buffer-right 10000
+
+Working run:
+python scripts/visualization/make_infer_sundarbans_lulc_map.py --year 2017     --buffer-top 1000 --buffer-bottom 15800 --buffer-left 10000 --buffer-right 10000
 """
 
 from __future__ import annotations
@@ -75,12 +78,12 @@ BUFFER_RIGHT_M  = 10000
 
 # Scale bar — 25 km suits the ~100 km Sundarbans extent
 SCALEBAR_LENGTH_KM = 25
-SCALEBAR_X_FRAC = 0.03
+SCALEBAR_X_FRAC = 0.015
 SCALEBAR_Y_FRAC = 0.04
 
 # Bay of Bengal label — bottom strip of the clipped extent
-BAY_LABEL_X_FRAC = 0.50
-BAY_LABEL_Y_FRAC = 0.04
+BAY_LABEL_X_FRAC = 0.75
+BAY_LABEL_Y_FRAC = 0.17
 
 # North arrow — upper-right corner
 NORTH_ARROW_XY = (0.93, 0.91)
@@ -451,7 +454,7 @@ def main() -> None:
         framealpha=LEGEND_BOX_ALPHA,
         facecolor=legend_face,
         edgecolor=main_text_color,
-        ncol=1,
+        ncol=2,
         handlelength=LEGEND_HANDLE_LENGTH,
         handleheight=LEGEND_HANDLE_HEIGHT,
         labelspacing=LEGEND_LABEL_SPACING,
