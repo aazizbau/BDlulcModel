@@ -196,12 +196,13 @@ def add_scalebar(
     length_km: int = 25,
     location: tuple[float, float] = (0.03, 0.04),
     fontsize: int = 10,
+    km_to_crs: float = 1000.0,
 ) -> None:
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
     x0 = xlim[0] + location[0] * (xlim[1] - xlim[0])
     y0 = ylim[0] + location[1] * (ylim[1] - ylim[0])
-    total_map_units = length_km * 1000.0
+    total_map_units = length_km * km_to_crs
     step_map_units = total_map_units / 2.0
     bar_h = 0.014 * (ylim[1] - ylim[0])
     half_km = length_km // 2
@@ -353,13 +354,24 @@ def main() -> None:
             raise ValueError("Input Dynamic World raster has no CRS.")
         raster_crs = ds.crs
 
-        # Reproject Sundarbans to raster CRS and compute clip extent with buffer
+        # Reproject Sundarbans to raster CRS and compute clip extent with buffer.
+        # If the raster CRS is geographic (degrees), convert metre buffers to degrees.
         sundarbans = sundarbans_wgs84.to_crs(raster_crs)
         sb_bounds = sundarbans.total_bounds  # [minx, miny, maxx, maxy]
-        clip_left   = sb_bounds[0] - args.buffer_left
-        clip_bottom = sb_bounds[1] - args.buffer_bottom
-        clip_right  = sb_bounds[2] + args.buffer_right
-        clip_top    = sb_bounds[3] + args.buffer_top
+        if raster_crs.is_geographic:
+            m_per_lat_deg = 111_320.0
+            m_per_lon_deg = 111_320.0 * np.cos(np.deg2rad(mean_lat_deg))
+            buf_top    = args.buffer_top    / m_per_lat_deg
+            buf_bottom = args.buffer_bottom / m_per_lat_deg
+            buf_left   = args.buffer_left   / m_per_lon_deg
+            buf_right  = args.buffer_right  / m_per_lon_deg
+        else:
+            buf_top, buf_bottom = args.buffer_top, args.buffer_bottom
+            buf_left, buf_right = args.buffer_left, args.buffer_right
+        clip_left   = sb_bounds[0] - buf_left
+        clip_bottom = sb_bounds[1] - buf_bottom
+        clip_right  = sb_bounds[2] + buf_right
+        clip_top    = sb_bounds[3] + buf_top
 
         classes, actual_bounds = read_clipped_class_raster(
             ds,
@@ -424,7 +436,7 @@ def main() -> None:
 
     # Correct aspect for latitude distortion
     cosv = np.cos(np.deg2rad(mean_lat_deg))
-    ax.set_aspect(1.0 / cosv if abs(cosv) > 1e-8 else "equal")
+    ax.set_aspect(1.0 / cosv if abs(cosv) > 1e-8 else "equal", adjustable="datalim")
 
     add_graticule(ax, color=grid_color, src_crs=raster_crs)
 
@@ -436,8 +448,10 @@ def main() -> None:
     plt.setp(ax.get_xticklabels(), rotation=25, ha="right")
 
     add_north_arrow(ax, north_arrow, xy=NORTH_ARROW_XY, zoom=NORTH_ARROW_ZOOM)
+    km_to_crs = (1.0 / 111.32) if raster_crs.is_geographic else 1000.0
     add_scalebar(ax, length_km=SCALEBAR_LENGTH_KM,
-                 location=(SCALEBAR_X_FRAC, SCALEBAR_Y_FRAC), fontsize=10)
+                 location=(SCALEBAR_X_FRAC, SCALEBAR_Y_FRAC), fontsize=10,
+                 km_to_crs=km_to_crs)
 
     legend = ax.legend(
         handles=legend_handles(),
