@@ -436,7 +436,7 @@ def main() -> None:
 
     # Correct aspect for latitude distortion
     cosv = np.cos(np.deg2rad(mean_lat_deg))
-    ax.set_aspect(1.0 / cosv if abs(cosv) > 1e-8 else "equal", adjustable="datalim")
+    ax.set_aspect(1.0 / cosv if abs(cosv) > 1e-8 else "equal")
 
     add_graticule(ax, color=grid_color, src_crs=raster_crs)
 
