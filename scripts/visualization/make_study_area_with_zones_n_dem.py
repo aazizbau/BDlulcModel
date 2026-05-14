@@ -227,6 +227,13 @@ def set_geographic_aspect(ax, bounds) -> None:
     ax.set_aspect("equal" if abs(cosv) < 1e-8 else 1.0 / cosv)
 
 
+def set_geographic_aspect_from_extent(ax, extent: tuple[float, float, float, float]) -> None:
+    _, _, ymin, ymax = extent
+    mean_lat = 0.5 * (ymin + ymax)
+    cosv = np.cos(np.deg2rad(mean_lat))
+    ax.set_aspect("equal" if abs(cosv) < 1e-8 else 1.0 / cosv)
+
+
 def hillshade_from_array(arr: np.ndarray, azimuth=315.0, altitude=45.0) -> np.ndarray:
     x, y = np.gradient(arr.astype(np.float32))
     slope = np.pi / 2.0 - np.arctan(np.sqrt(x * x + y * y))
@@ -284,6 +291,30 @@ def read_downsampled_raster_windowed(
     return out
 
 
+def valid_data_extent_from_preview(
+    valid_mask: np.ndarray,
+    bounds,
+) -> tuple[float, float, float, float]:
+    rows, cols = np.where(valid_mask)
+    if rows.size == 0 or cols.size == 0:
+        return bounds.left, bounds.right, bounds.bottom, bounds.top
+
+    h, w = valid_mask.shape
+    row_min = int(rows.min())
+    row_max = int(rows.max()) + 1
+    col_min = int(cols.min())
+    col_max = int(cols.max()) + 1
+
+    xres = (bounds.right - bounds.left) / w
+    yres = (bounds.top - bounds.bottom) / h
+
+    xmin = bounds.left + col_min * xres
+    xmax = bounds.left + col_max * xres
+    ymax = bounds.top - row_min * yres
+    ymin = bounds.top - row_max * yres
+    return xmin, xmax, ymin, ymax
+
+
 def main() -> None:
     args = parse_args()
     zone_map = resolve_path(args.zone_map)
@@ -327,6 +358,7 @@ def main() -> None:
     valid = np.isfinite(dem)
     if not valid.any():
         raise ValueError("DEM raster contains no finite values.")
+    plot_extent = valid_data_extent_from_preview(valid, bounds)
 
     dem_rgb = dem_cmap(dem_norm(np.nan_to_num(dem, nan=DEM_BINS[0])))[..., :3]
     hillshade = hillshade_from_array(np.nan_to_num(dem, nan=float(np.nanmedian(dem))))
@@ -368,6 +400,8 @@ def main() -> None:
     )
     zones.boundary.plot(ax=ax, color=zone_edge, linewidth=1.6, zorder=4)
     sundarbans.boundary.plot(ax=ax, color=zone_edge, linewidth=1.4, zorder=5)
+    ax.set_xlim(plot_extent[0], plot_extent[1])
+    ax.set_ylim(plot_extent[2], plot_extent[3])
 
     for _, row in zones.iterrows():
         geom = row.geometry
@@ -410,8 +444,8 @@ def main() -> None:
         )
         txt.set_path_effects([pe.Stroke(linewidth=3, foreground=fig_bg), pe.Normal()])
 
-    xmid = 0.5 * (bounds.left + bounds.right)
-    bay_y = bounds.bottom + 0.18 * (bounds.top - bounds.bottom)
+    xmid = 0.5 * (plot_extent[0] + plot_extent[1])
+    bay_y = plot_extent[2] + 0.18 * (plot_extent[3] - plot_extent[2])
     bay_txt = ax.text(
         xmid,
         bay_y,
@@ -424,7 +458,7 @@ def main() -> None:
     )
     bay_txt.set_path_effects([pe.Stroke(linewidth=4, foreground=fig_bg), pe.Normal()])
 
-    set_geographic_aspect(ax, bounds)
+    set_geographic_aspect_from_extent(ax, plot_extent)
 
     add_graticule(ax, color=grid_color)
     ax.set_title(MAP_TITLE, fontsize=15, pad=12, color=zone_text_color, fontweight="bold")
