@@ -186,7 +186,12 @@ def read_crop_multiband_rgb(
         bounds_src = transform_bounds("EPSG:4326", src.crs, *bbox4326, densify_pts=21)
         window = from_bounds(*bounds_src, transform=src.transform)
 
-        arr = src.read([1, 2, 3], window=window).astype("float32")
+        arr = src.read(
+            [1, 2, 3],
+            window=window,
+            boundless=True,
+            fill_value=nodata,
+        ).astype("float32")
         extent = window_extent(src, window)
 
         crs_text = src.crs.to_string()
@@ -210,7 +215,12 @@ def read_crop_single_band(
         bounds_src = transform_bounds("EPSG:4326", src.crs, *bbox4326, densify_pts=21)
         window = from_bounds(*bounds_src, transform=src.transform)
 
-        arr = src.read(1, window=window).astype("float32")
+        arr = src.read(
+            1,
+            window=window,
+            boundless=True,
+            fill_value=nodata,
+        ).astype("float32")
         extent = window_extent(src, window)
 
         crs_text = src.crs.to_string()
