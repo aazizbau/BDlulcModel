@@ -228,18 +228,24 @@ def download_file(url: str, out_zip: Path) -> None:
     raise RuntimeError(f"Download failed: {last_err}")
 
 
-def extract_geotiff(downloaded_zip: Path, final_out: Path) -> None:
-    extract_dir = downloaded_zip.with_suffix("")
+def extract_geotiff(downloaded_file: Path, final_out: Path) -> None:
+    final_out.parent.mkdir(parents=True, exist_ok=True)
+
+    if not zipfile.is_zipfile(downloaded_file):
+        downloaded_file.replace(final_out)
+        log(f"Saved GeoTIFF: {final_out}")
+        return
+
+    extract_dir = downloaded_file.with_suffix("")
     extract_dir.mkdir(parents=True, exist_ok=True)
 
-    with zipfile.ZipFile(downloaded_zip, "r") as z:
+    with zipfile.ZipFile(downloaded_file, "r") as z:
         z.extractall(extract_dir)
 
     tif_files = sorted(extract_dir.glob("*.tif"))
     if not tif_files:
-        raise FileNotFoundError(f"No GeoTIFF found inside {downloaded_zip}")
+        raise FileNotFoundError(f"No GeoTIFF found inside {downloaded_file}")
 
-    final_out.parent.mkdir(parents=True, exist_ok=True)
     tif_files[0].replace(final_out)
 
     log(f"Saved GeoTIFF: {final_out}")
