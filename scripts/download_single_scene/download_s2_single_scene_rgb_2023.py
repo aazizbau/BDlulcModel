@@ -7,7 +7,7 @@ Purpose:
     without median composite generation.
 
 Example:
-    python scripts/download/download_s2_single_scene_rgb_2023.py \
+    python scripts/download_single_scene/download_s2_single_scene_rgb_2023.py \
         --year 2023 \
         --bbox 89.88 23.78 89.96 23.84 \
         --project YOUR_GEE_PROJECT_ID \
@@ -134,11 +134,12 @@ def mask_s2_cloud_score_plus(img: ee.Image, threshold: float) -> ee.Image:
     """
     Apply Cloud Score+ clear-sky masking.
 
-    Missing Cloud Score+ values are treated as invalid here because the purpose
-    is to create a single-scene image where missing/cloud-masked pixels remain visible.
+    Missing Cloud Score+ values are kept because some granules have partial or
+    missing Cloud Score+ coverage even when the Sentinel-2 scene itself is valid.
     """
     qa = img.select(QA_BAND)
-    clear_mask = qa.gte(threshold)
+    qa_unmasked = qa.unmask(-1)
+    clear_mask = qa_unmasked.gte(threshold).Or(qa_unmasked.eq(-1))
 
     return (
         img.updateMask(clear_mask)

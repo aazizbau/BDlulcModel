@@ -23,6 +23,7 @@ BBOX order:
 from __future__ import annotations
 
 import argparse
+import io
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -30,13 +31,22 @@ from zoneinfo import ZoneInfo
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
-from matplotlib.patches import Polygon, Rectangle
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
+from matplotlib.patches import Rectangle
 from matplotlib.ticker import FuncFormatter
+from PIL import Image
 from rasterio.warp import transform_bounds
 from rasterio.windows import from_bounds
 
+try:
+    import cairosvg
+
+    HAVE_SVG = True
+except Exception:
+    HAVE_SVG = False
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_NORTH_ARROW = Path("assets/maps/NorthArrow.svg")
 NODATA_DEFAULT = 65535
 
 
@@ -118,14 +128,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--title-a", type=str, default="Image (A)")
     p.add_argument("--title-b", type=str, default="Image (B)")
 
-    p.add_argument(
-        "--caption",
-        type=str,
-        default=(
-            "Figure 3.1: Comparison of single-date cloud-masked Sentinel-2 RGB imagery "
-            "(A) and Oct-Dec median composite Sentinel-2 RGB imagery (B) used in this study."
-        ),
-    )
+    p.add_argument("--north-arrow", type=Path, default=DEFAULT_NORTH_ARROW, help="North arrow SVG path.")
 
     return p.parse_args()
 
@@ -158,6 +161,27 @@ def decimal_degree_to_dm(value: float, axis: str) -> str:
         minutes = 0
 
     return f"{deg}°{minutes:02d}′{direction}"
+
+
+def assert_bbox_overlaps_raster(path: Path, bbox4326: list[float]) -> None:
+    with rasterio.open(path) as src:
+        bounds_src = transform_bounds("EPSG:4326", src.crs, *bbox4326, densify_pts=21)
+        req_left, req_bottom, req_right, req_top = bounds_src
+        src_left, src_bottom, src_right, src_top = src.bounds
+
+    overlaps = (
+        req_left < src_right
+        and req_right > src_left
+        and req_bottom < src_top
+        and req_top > src_bottom
+    )
+    if not overlaps:
+        raise ValueError(
+            "Requested --bbox does not overlap the composite raster. "
+            f"bbox(EPSG:4326)={bbox4326}; composite bounds({path})="
+            f"left={src_left:.6f}, bottom={src_bottom:.6f}, right={src_right:.6f}, top={src_top:.6f}. "
+            "Choose a bbox inside the composite coverage or regenerate the composite for this area."
+        )
 
 
 def read_crop_multiband_rgb(
@@ -210,6 +234,7 @@ def read_crop_single_band(
     path = resolve_path(path)
     if not path.exists():
         raise FileNotFoundError(f"Raster not found: {path}")
+    assert_bbox_overlaps_raster(path, bbox4326)
 
     with rasterio.open(path) as src:
         bounds_src = transform_bounds("EPSG:4326", src.crs, *bbox4326, densify_pts=21)
@@ -303,7 +328,7 @@ def stretch_rgb(rgb: np.ndarray, p_low: float = 2, p_high: float = 98) -> np.nda
     return np.moveaxis(out, 0, -1)
 
 
-def setup_axis(ax, bbox: list[float]) -> None:
+def setup_axis(ax, bbox: list[float], show_left_labels: bool = True, show_right_labels: bool = True) -> None:
     min_lon, min_lat, max_lon, max_lat = bbox
 
     ax.set_xlim(min_lon, max_lon)
@@ -338,7 +363,8 @@ def setup_axis(ax, bbox: list[float]) -> None:
         top=True,
         right=True,
         labeltop=True,
-        labelright=True,
+        labelleft=show_left_labels,
+        labelright=show_right_labels,
     )
 
     ax.grid(color="black", linewidth=0.45, alpha=0.55)
@@ -431,93 +457,36 @@ def add_scalebar(ax, bbox: list[float], length_km: float = 2.0) -> None:
     )
 
 
-def add_north_arrow(ax, bbox: list[float]) -> None:
-    """
-    Add a simple north arrow similar to thesis map style.
-    """
-    min_lon, min_lat, max_lon, max_lat = bbox
-    dx = max_lon - min_lon
-    dy = max_lat - min_lat
+def load_svg_as_image(svg_path: Path, target_height_px: int = 220):
+    if not svg_path.exists() or not HAVE_SVG:
+        return None
+    png_bytes = cairosvg.svg2png(url=str(svg_path), output_height=target_height_px)
+    return Image.open(io.BytesIO(png_bytes))
 
-    cx = max_lon - dx * 0.10
-    cy = max_lat - dy * 0.13
 
-    arrow_h = dy * 0.12
-    arrow_w = dx * 0.035
-
-    outer = np.array(
-        [
-            [cx, cy + arrow_h],
-            [cx - arrow_w, cy - arrow_h * 0.30],
-            [cx, cy],
-            [cx + arrow_w, cy - arrow_h * 0.30],
-        ]
-    )
-
-    inner_left = np.array(
-        [
-            [cx, cy + arrow_h * 0.72],
-            [cx - arrow_w * 0.45, cy - arrow_h * 0.10],
-            [cx, cy],
-        ]
-    )
-
-    inner_right = np.array(
-        [
-            [cx, cy + arrow_h * 0.72],
-            [cx, cy],
-            [cx + arrow_w * 0.45, cy - arrow_h * 0.10],
-        ]
-    )
-
-    ax.add_patch(
-        Polygon(
-            outer,
-            closed=True,
-            facecolor="white",
-            edgecolor="black",
-            linewidth=1.2,
-            zorder=9,
+def add_north_arrow(ax, svg_path: Path, xy=(0.90, 0.88), zoom=0.20) -> None:
+    img = load_svg_as_image(svg_path, target_height_px=220)
+    if img is None:
+        ax.annotate("N", xy=xy, xycoords="axes fraction", ha="center", va="center", fontsize=13, fontweight="bold", zorder=20)
+        ax.annotate(
+            "",
+            xy=(xy[0], xy[1] - 0.03),
+            xytext=(xy[0], xy[1] - 0.13),
+            xycoords="axes fraction",
+            arrowprops=dict(arrowstyle="-|>", lw=1.3, color="black"),
+            zorder=20,
         )
-    )
-    ax.add_patch(
-        Polygon(
-            inner_left,
-            closed=True,
-            facecolor="black",
-            edgecolor="black",
-            linewidth=0.8,
-            zorder=10,
-        )
-    )
-    ax.add_patch(
-        Polygon(
-            inner_right,
-            closed=True,
-            facecolor="white",
-            edgecolor="black",
-            linewidth=0.8,
-            zorder=10,
-        )
-    )
-
-    ax.text(
-        cx,
-        cy + arrow_h * 1.12,
-        "N",
-        ha="center",
-        va="center",
-        fontsize=9,
-        fontweight="bold",
-        color="black",
-        zorder=11,
-    )
+        return
+    imagebox = OffsetImage(np.asarray(img), zoom=zoom)
+    ab = AnnotationBbox(imagebox, xy, xycoords="axes fraction", frameon=False, box_alignment=(0.5, 0.5), zorder=20)
+    ax.add_artist(ab)
 
 
 def main() -> None:
     args = parse_args()
     args.single_rgb = resolve_path(args.single_rgb)
     args.out = resolve_path(args.out)
+    north_arrow = resolve_path(args.north_arrow)
     bbox = list(args.bbox)
 
     comp_red, comp_green, comp_blue = resolve_composite_paths(args)
@@ -552,45 +521,30 @@ def main() -> None:
     single_rgb_vis = stretch_rgb(single_rgb)
     comp_rgb_vis = stretch_rgb(comp_rgb)
 
-    fig = plt.figure(figsize=(8.5, 4.9))
+    fig = plt.figure(figsize=(8.5, 3.7))
     gs = fig.add_gridspec(
-        nrows=2,
+        nrows=1,
         ncols=2,
-        height_ratios=[1.0, 0.18],
-        hspace=0.08,
         wspace=0.10,
     )
 
-    ax_a = fig.add_subplot(gs[0, 0])
-    ax_b = fig.add_subplot(gs[0, 1])
-    ax_caption = fig.add_subplot(gs[1, :])
+    ax_a = fig.add_subplot(gs[0])
+    ax_b = fig.add_subplot(gs[1])
 
     ax_a.imshow(single_rgb_vis, extent=single_extent, origin="upper")
     ax_b.imshow(comp_rgb_vis, extent=comp_extent, origin="upper")
 
-    setup_axis(ax_a, bbox)
-    setup_axis(ax_b, bbox)
+    setup_axis(ax_a, bbox, show_left_labels=True, show_right_labels=False)
+    setup_axis(ax_b, bbox, show_left_labels=False, show_right_labels=True)
 
     add_panel_label(ax_a, args.title_a)
     add_panel_label(ax_b, args.title_b)
 
-    add_north_arrow(ax_a, bbox)
-    add_north_arrow(ax_b, bbox)
+    add_north_arrow(ax_a, north_arrow)
+    add_north_arrow(ax_b, north_arrow)
 
     add_scalebar(ax_a, bbox, length_km=2)
     add_scalebar(ax_b, bbox, length_km=2)
-
-    ax_caption.axis("off")
-    ax_caption.text(
-        0.5,
-        0.58,
-        args.caption,
-        ha="center",
-        va="center",
-        fontsize=11,
-        fontfamily="serif",
-        wrap=True,
-    )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(args.out, dpi=args.dpi, bbox_inches="tight")
