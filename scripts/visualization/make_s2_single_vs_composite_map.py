@@ -328,6 +328,15 @@ def stretch_rgb(rgb: np.ndarray, p_low: float = 2, p_high: float = 98) -> np.nda
     return np.moveaxis(out, 0, -1)
 
 
+def require_valid_rgb(rgb: np.ndarray, label: str, bbox: list[float]) -> None:
+    valid = np.isfinite(rgb).all(axis=0)
+    if not np.any(valid):
+        raise ValueError(
+            f"{label} has no valid pixels inside --bbox {bbox}. "
+            "Choose a bbox with valid source pixels or regenerate/download the source for this area."
+        )
+
+
 def setup_axis(ax, bbox: list[float], show_left_labels: bool = True, show_right_labels: bool = True) -> None:
     min_lon, min_lat, max_lon, max_lat = bbox
 
@@ -517,6 +526,9 @@ def main() -> None:
 
     if comp_crs != "EPSG:4326":
         log(f"WARNING: composite CRS is {comp_crs}. This script expects EPSG:4326 for map axes.")
+
+    require_valid_rgb(single_rgb, "Single-date RGB image", bbox)
+    require_valid_rgb(comp_rgb, "Oct-Dec composite RGB image", bbox)
 
     single_rgb_vis = stretch_rgb(single_rgb)
     comp_rgb_vis = stretch_rgb(comp_rgb)

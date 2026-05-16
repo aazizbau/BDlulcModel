@@ -167,8 +167,11 @@ def build_single_scene(year: int, bbox: list[float], threshold: float, max_cloud
 
     linked = s2.linkCollection(cs, [QA_BAND])
 
-    # Select the least cloudy Sentinel-2 scene in the target dry-season window.
+    # Select the least cloudy Sentinel-2 scene in the target dry-season window,
+    # then mosaic all granules from that same date so AOIs crossing MGRS tile
+    # boundaries are not exported as a narrow strip.
     selected = ee.Image(linked.sort("CLOUDY_PIXEL_PERCENTAGE").first())
+    selected_date = ee.Date(selected.get("system:time_start"))
 
     selected_info = selected.toDictionary(
         ["system:index", "system:time_start", "CLOUDY_PIXEL_PERCENTAGE", "MGRS_TILE"]
@@ -177,13 +180,21 @@ def build_single_scene(year: int, bbox: list[float], threshold: float, max_cloud
     log("Selected Sentinel-2 scene:")
     log(json.dumps(selected_info, indent=2))
 
-    rgb = mask_s2_cloud_score_plus(selected, threshold).clip(roi)
+    same_date_rgb = (
+        linked.filterDate(selected_date, selected_date.advance(1, "day"))
+        .filterBounds(roi)
+        .map(lambda img: mask_s2_cloud_score_plus(img, threshold))
+        .mosaic()
+        .clip(roi)
+        .unmask(NODATA)
+        .toUint16()
+    )
 
-    return rgb.set({
+    return same_date_rgb.set({
         "selected_scene": selected_info.get("system:index"),
         "cloud_threshold": threshold,
         "year": year,
-        "purpose": "single_scene_cloud_masked_rgb_without_median_composite",
+        "purpose": "single_date_cloud_masked_rgb_without_median_composite",
     })
 
 
