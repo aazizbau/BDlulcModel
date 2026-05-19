@@ -24,6 +24,7 @@ Example
 python scripts/visualization/make_study_area_with_zones_n_dsm.py \
     --zone-map assets/maps/bd_coastal_zones.gpkg \
     --dsm-data data/processed/dsm/bd_coastal_aw3d30_v41_dsm_clipped.tif \
+    --add-title \
     --output outputs/figures/study_area_with_zones_n_dsm.png
 """
 
@@ -100,6 +101,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--north-arrow", type=Path, default=DEFAULT_NORTH_ARROW, help="North arrow SVG path.")
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
     p.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="Output PNG path.")
+    p.add_argument("--add-title", action="store_true", help="Add map title above the figure.")
     return p.parse_args()
 
 
@@ -456,7 +458,8 @@ def main() -> None:
     set_geographic_aspect(ax, bounds)
 
     add_graticule(ax, color=grid_color)
-    ax.set_title(MAP_TITLE, fontsize=15, pad=12, color=zone_text_color, fontweight="bold")
+    if args.add_title:
+        ax.set_title(MAP_TITLE, fontsize=15, pad=12, color=zone_text_color, fontweight="bold")
     ax.set_xlabel(X_AXIS_LABEL, fontsize=12, color=zone_text_color, labelpad=LONGITUDE_LABEL_PAD)
     ax.set_ylabel(Y_AXIS_LABEL, fontsize=12, color=zone_text_color)
     ax.tick_params(axis="both", colors=zone_text_color)
