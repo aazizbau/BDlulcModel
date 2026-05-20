@@ -16,6 +16,7 @@ Example
 -------
 python scripts/visualization/visualize_best_model_learning_curves.py \
     --model-name mlp_ae64plus10idx_h512-256_do03_lr1e3_bs4096_v3 \
+    --add-title \
     --output outputs/figures/best_model_learning_curves.png
 """
 
@@ -50,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Project color palette JSON.")
     p.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="Output PNG path.")
     p.add_argument("--dpi", type=int, default=300, help="Output figure DPI.")
-    p.add_argument("--no-title", action="store_true", help="Do not add a figure title.")
+    p.add_argument("--add-title", action="store_true", help="Add model name as a figure title.")
     return p.parse_args()
 
 
@@ -142,7 +143,7 @@ def plot_learning_curves(
     axes[0].plot(epoch, numeric_series(df, "val_loss"), color=val_color, linewidth=2.2, label="Validation loss")
     axes[0].set_xlabel("Epoch", color=axis_color, fontsize=11)
     axes[0].set_ylabel("Loss", color=axis_color, fontsize=11)
-    axes[0].set_title("Loss", color=axis_color, fontsize=13, fontweight="bold")
+    axes[0].set_title("Image (A) Loss", color=axis_color, fontsize=13, fontweight="bold", pad=10)
     axes[0].legend(frameon=False, fontsize=10)
 
     axes[1].plot(epoch, numeric_series(df, "train_acc"), color=train_color, linewidth=2.2, label="Training accuracy")
@@ -157,7 +158,7 @@ def plot_learning_curves(
         )
     axes[1].set_xlabel("Epoch", color=axis_color, fontsize=11)
     axes[1].set_ylabel("Accuracy", color=axis_color, fontsize=11)
-    axes[1].set_title("Accuracy", color=axis_color, fontsize=13, fontweight="bold")
+    axes[1].set_title("Image (B) Accuracy", color=axis_color, fontsize=13, fontweight="bold", pad=10)
     axes[1].set_ylim(0, 1.02)
     axes[1].legend(frameon=False, fontsize=10)
 
@@ -189,7 +190,7 @@ def main() -> None:
         output=output,
         palette=palette,
         dpi=args.dpi,
-        add_title=not args.no_title,
+        add_title=args.add_title,
     )
 
     print(f"History source: {source}")
