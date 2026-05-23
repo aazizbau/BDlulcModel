@@ -29,8 +29,16 @@ Outputs:
 
 Example Run:
     python scripts/analysis/compare_models_and_visualize_accuary.py
+
+Complete Example Run:
+    python scripts/analysis/compare_models_and_visualize_accuary.py \
+        --add-title \
+        --output-plot outputs/figures/test_accuracy_comapre_models_plot.png \
+        --output-table outputs/figures/test_accuracy_compare_models_table.png \
+        --output-csv outputs/figures/test_accuracy_compare_models_table.csv
 """
 
+import argparse
 import os
 import textwrap
 import numpy as np
@@ -47,7 +55,41 @@ OUTPUT_PLOT = os.path.join(OUTPUT_DIR, "test_accuracy_comapre_models_plot.png")
 OUTPUT_TABLE_PNG = os.path.join(OUTPUT_DIR, "test_accuracy_compare_models_table.png")
 OUTPUT_TABLE_CSV = os.path.join(OUTPUT_DIR, "test_accuracy_compare_models_table.csv")
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# ── Command-line arguments ──────────────────────────────────────────────────
+parser = argparse.ArgumentParser(
+    description="Compare best test accuracy results among model families."
+)
+parser.add_argument(
+    "--add-title",
+    action="store_true",
+    help="Show title and subtitle on top of the plot and table.",
+)
+parser.add_argument(
+    "--output-plot",
+    default=OUTPUT_PLOT,
+    help=f"Output plot PNG path. Default: {OUTPUT_PLOT}",
+)
+parser.add_argument(
+    "--output-table",
+    default=OUTPUT_TABLE_PNG,
+    help=f"Output table PNG path. Default: {OUTPUT_TABLE_PNG}",
+)
+parser.add_argument(
+    "--output-csv",
+    default=OUTPUT_TABLE_CSV,
+    help=f"Output table CSV path. Default: {OUTPUT_TABLE_CSV}",
+)
+args = parser.parse_args()
+
+OUTPUT_PLOT = args.output_plot
+OUTPUT_TABLE_PNG = args.output_table
+OUTPUT_TABLE_CSV = args.output_csv
+
+for output_path in [OUTPUT_PLOT, OUTPUT_TABLE_PNG, OUTPUT_TABLE_CSV]:
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
 
 
 # ── Expected model-family order ──────────────────────────────────────────────
@@ -367,13 +409,14 @@ best_family = table_df.loc[best_idx, "Model Family"]
 best_overall = table_df.loc[best_idx, "Overall Accuracy (%)"]
 best_feature_set = table_df.loc[best_idx, "Feature Set"]
 
-ax.set_title(
-    "Comparison of Best Test Models by Model Family\n"
-    f"Best Overall: {best_family} | Feature Set: {best_feature_set} | "
-    f"Overall Accuracy: {best_overall:.2f}%",
-    fontsize=13,
-    pad=14,
-)
+if args.add_title:
+    ax.set_title(
+        "Comparison of Best Test Models by Model Family\n"
+        f"Best Overall: {best_family} | Feature Set: {best_feature_set} | "
+        f"Overall Accuracy: {best_overall:.2f}%",
+        fontsize=13,
+        pad=14,
+    )
 
 ax.legend(
     loc="upper center",
@@ -444,12 +487,12 @@ fig_height = max(4.5, 0.65 * len(display_df) + 2.5)
 fig, ax = plt.subplots(figsize=(20, fig_height))
 ax.axis("off")
 
-title = (
-    "Accuracy Assessment Comparison Table — Best Test Run per Model Family\n"
-    f"Best Overall: {best_family} | Overall Accuracy: {best_overall:.2f}%"
-)
-
-ax.set_title(title, fontsize=14, pad=18)
+if args.add_title:
+    title = (
+        "Accuracy Assessment Comparison Table — Best Test Run per Model Family\n"
+        f"Best Overall: {best_family} | Overall Accuracy: {best_overall:.2f}%"
+    )
+    ax.set_title(title, fontsize=14, pad=18)
 
 table = ax.table(
     cellText=display_df.values,
