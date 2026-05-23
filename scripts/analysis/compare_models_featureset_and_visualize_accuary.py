@@ -33,8 +33,16 @@ Outputs:
 
 Example Run:
     python scripts/analysis/compare_models_featureset_and_visualize_accuary.py
+
+Complete Example Run:
+    python scripts/analysis/compare_models_featureset_and_visualize_accuary.py \
+        --add-title \
+        --output-plot outputs/figures/test_accuracy_compare_featureset_plot.png \
+        --output-table outputs/figures/test_accuracy_compare_featureset_table.png \
+        --output-csv outputs/figures/test_accuracy_compare_featureset_table.csv
 """
 
+import argparse
 import os
 import textwrap
 import numpy as np
@@ -48,7 +56,42 @@ OUTPUT_DIR = "outputs/figures"
 OUTPUT_PLOT     = os.path.join(OUTPUT_DIR, "test_accuracy_compare_featureset_plot.png")
 OUTPUT_TABLE_PNG = os.path.join(OUTPUT_DIR, "test_accuracy_compare_featureset_table.png")
 OUTPUT_TABLE_CSV = os.path.join(OUTPUT_DIR, "test_accuracy_compare_featureset_table.csv")
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+# ── Command-line arguments ───────────────────────────────────────────────────
+parser = argparse.ArgumentParser(
+    description="Compare feature sets across model families."
+)
+parser.add_argument(
+    "--add-title",
+    action="store_true",
+    help="Show title and subtitle on top of the plot and table.",
+)
+parser.add_argument(
+    "--output-plot",
+    default=OUTPUT_PLOT,
+    help=f"Output plot PNG path. Default: {OUTPUT_PLOT}",
+)
+parser.add_argument(
+    "--output-table",
+    default=OUTPUT_TABLE_PNG,
+    help=f"Output table PNG path. Default: {OUTPUT_TABLE_PNG}",
+)
+parser.add_argument(
+    "--output-csv",
+    default=OUTPUT_TABLE_CSV,
+    help=f"Output table CSV path. Default: {OUTPUT_TABLE_CSV}",
+)
+args = parser.parse_args()
+
+OUTPUT_PLOT = args.output_plot
+OUTPUT_TABLE_PNG = args.output_table
+OUTPUT_TABLE_CSV = args.output_csv
+
+for output_path in [OUTPUT_PLOT, OUTPUT_TABLE_PNG, OUTPUT_TABLE_CSV]:
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
 
 
 # ── Expected orders ────────────────────────────────────────────────────────────
@@ -369,13 +412,14 @@ best_family = best_row["Model Family"]
 best_fs     = best_row["Feature Set"]
 best_oa     = best_row["Overall Accuracy (%)"]
 
-ax.set_title(
-    "Feature Set Comparison: AE64 vs AE64 + 10 Indices — Best Test Run per Model Family\n"
-    f"Best Overall: {best_family} | Feature Set: {FEATURE_SET_DISPLAY[best_fs]} | "
-    f"Overall Accuracy: {best_oa:.2f}%  (Δ = AE64 + 10 Indices − AE64)",
-    fontsize=12,
-    pad=14,
-)
+if args.add_title:
+    ax.set_title(
+        "Feature Set Comparison: AE64 vs AE64 + 10 Indices — Best Test Run per Model Family\n"
+        f"Best Overall: {best_family} | Feature Set: {FEATURE_SET_DISPLAY[best_fs]} | "
+        f"Overall Accuracy: {best_oa:.2f}%  (Δ = AE64 + 10 Indices − AE64)",
+        fontsize=12,
+        pad=14,
+    )
 ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=2,
           frameon=True, fontsize=10)
 
@@ -439,13 +483,14 @@ fig_height = max(5.0, 0.72 * len(display_df) + 2.5)
 fig, ax = plt.subplots(figsize=(22, fig_height))
 ax.axis("off")
 
-title = (
-    "Accuracy Assessment Comparison — Feature Set AE64 vs AE64 + 10 Indices "
-    "(Best Test Run per Model Family × Feature Set)\n"
-    f"Best Overall: {best_family} | Feature Set: {FEATURE_SET_DISPLAY[best_fs]} | "
-    f"Overall Accuracy: {best_oa:.2f}%"
-)
-ax.set_title(title, fontsize=13, pad=18)
+if args.add_title:
+    title = (
+        "Accuracy Assessment Comparison — Feature Set AE64 vs AE64 + 10 Indices "
+        "(Best Test Run per Model Family × Feature Set)\n"
+        f"Best Overall: {best_family} | Feature Set: {FEATURE_SET_DISPLAY[best_fs]} | "
+        f"Overall Accuracy: {best_oa:.2f}%"
+    )
+    ax.set_title(title, fontsize=13, pad=18)
 
 table = ax.table(
     cellText=display_df.values,
