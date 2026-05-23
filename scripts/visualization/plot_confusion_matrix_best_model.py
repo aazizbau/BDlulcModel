@@ -5,12 +5,18 @@ Best model is identified by highest overall accuracy on the test split.
 The test split confusion matrix for that run is then plotted and saved.
 
 Input  : outputs/master_training_with_outputs/all_confusion_matrices_long.csv
-Output : outputs/test_confusion_matrix_bestmodel.png
+Output : outputs/figures/test_confusion_matrix_bestmodel.png
 
 Example Run:
-python scripts/visualization/plot_confusion_matrix_best_model.py
+    python scripts/visualization/plot_confusion_matrix_best_model.py
+
+Complete Example Run:
+    python scripts/visualization/plot_confusion_matrix_best_model.py \
+        --add-title \
+        --output-plot outputs/figures/test_confusion_matrix_bestmodel.png
 """
 
+import argparse
 import os
 import numpy as np
 import pandas as pd
@@ -22,7 +28,28 @@ from matplotlib.colors import LinearSegmentedColormap
 INPUT_CSV = "outputs/master_training_with_outputs/all_confusion_matrices_long.csv"
 OUTPUT_PNG = "outputs/figures/test_confusion_matrix_bestmodel.png"
 
-os.makedirs(os.path.dirname(OUTPUT_PNG), exist_ok=True)
+
+# ── Command-line arguments ──────────────────────────────────────────────────
+parser = argparse.ArgumentParser(
+    description="Plot the test confusion matrix for the best model."
+)
+parser.add_argument(
+    "--add-title",
+    action="store_true",
+    help="Show title and subtitle on top of the plot.",
+)
+parser.add_argument(
+    "--output-plot",
+    default=OUTPUT_PNG,
+    help=f"Output plot PNG path. Default: {OUTPUT_PNG}",
+)
+args = parser.parse_args()
+
+OUTPUT_PNG = args.output_plot
+
+output_dir = os.path.dirname(OUTPUT_PNG)
+if output_dir:
+    os.makedirs(output_dir, exist_ok=True)
 
 # ── LULC class names ─────────────────────────────────────────────────────────
 LULC_NAMES = {
@@ -167,41 +194,16 @@ for i in range(n):
 ax.set_xlabel("Predicted class", fontsize=12, labelpad=8)
 ax.set_ylabel("True class", fontsize=12, labelpad=8)
 
-ax.set_title(
-    "Test Confusion Matrix — Best Model by Test Accuracy\n"
-    f"Best Model: {best_model}, Best Feature Set: {best_feature_set}\n"
-    f"Overall Test Accuracy: {best_acc:.2%}",
-    fontsize=12,
-    pad=14,
-)
+if args.add_title:
+    ax.set_title(
+        "Test Confusion Matrix — Best Model by Test Accuracy\n"
+        f"Best Model: {best_model}, Best Feature Set: {best_feature_set}\n"
+        f"Overall Test Accuracy: {best_acc:.2%}",
+        fontsize=12,
+        pad=14,
+    )
 
-# ── Class legend on the right side ───────────────────────────────────────────
-legend_lines = ["Class legend"]
-legend_lines += [
-    f"{class_id}: {LULC_NAMES.get(class_id, 'Unknown class')}"
-    for class_id in classes
-]
-
-legend_text = "\n".join(legend_lines)
-
-fig.text(
-    0.78,
-    0.50,
-    legend_text,
-    ha="left",
-    va="center",
-    fontsize=9,
-    linespacing=1.45,
-    bbox=dict(
-        boxstyle="round,pad=0.5",
-        facecolor="white",
-        edgecolor="0.75",
-        alpha=0.95,
-    ),
-)
-
-# Leave space on right side for legend
-plt.tight_layout(rect=[0.00, 0.00, 0.76, 1.00])
+plt.tight_layout()
 
 fig.savefig(OUTPUT_PNG, dpi=150, bbox_inches="tight")
 print(f"\nSaved → {OUTPUT_PNG}")
