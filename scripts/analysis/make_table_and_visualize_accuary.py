@@ -26,7 +26,13 @@ Outputs:
 
 Example Run:
     python scripts/analysis/make_table_and_visualize_accuary.py
-    python scripts/analysis/make_table_and_visualize_accuary.py --add-title
+
+Complete Example Run:
+    python scripts/analysis/make_table_and_visualize_accuary.py \
+        --add-title \
+        --output-plot outputs/figures/test_accuracy_bestmodel_plot.png \
+        --output-table outputs/figures/test_accuracy_bestmodel_table.png \
+        --output-csv outputs/figures/test_accuracy_bestmodel_table.csv
 """
 
 import argparse
@@ -44,8 +50,6 @@ OUTPUT_PLOT = "outputs/figures/test_accuracy_bestmodel_plot.png"
 OUTPUT_TABLE_PNG = "outputs/figures/test_accuracy_bestmodel_table.png"
 OUTPUT_TABLE_CSV = "outputs/figures/test_accuracy_bestmodel_table.csv"
 
-os.makedirs(os.path.dirname(OUTPUT_PLOT), exist_ok=True)
-
 
 # ── Command-line arguments ──────────────────────────────────────────────────
 parser = argparse.ArgumentParser(
@@ -56,7 +60,31 @@ parser.add_argument(
     action="store_true",
     help="Show title and subtitle on top of the plot and table.",
 )
+parser.add_argument(
+    "--output-plot",
+    default=OUTPUT_PLOT,
+    help=f"Output plot PNG path. Default: {OUTPUT_PLOT}",
+)
+parser.add_argument(
+    "--output-table",
+    default=OUTPUT_TABLE_PNG,
+    help=f"Output table PNG path. Default: {OUTPUT_TABLE_PNG}",
+)
+parser.add_argument(
+    "--output-csv",
+    default=OUTPUT_TABLE_CSV,
+    help=f"Output table CSV path. Default: {OUTPUT_TABLE_CSV}",
+)
 args = parser.parse_args()
+
+OUTPUT_PLOT = args.output_plot
+OUTPUT_TABLE_PNG = args.output_table
+OUTPUT_TABLE_CSV = args.output_csv
+
+for output_path in [OUTPUT_PLOT, OUTPUT_TABLE_PNG, OUTPUT_TABLE_CSV]:
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
 
 
 # ── LULC class names ─────────────────────────────────────────────────────────
