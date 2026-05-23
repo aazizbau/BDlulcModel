@@ -26,8 +26,10 @@ Outputs:
 
 Example Run:
     python scripts/analysis/make_table_and_visualize_accuary.py
+    python scripts/analysis/make_table_and_visualize_accuary.py --add-title
 """
 
+import argparse
 import os
 import textwrap
 import numpy as np
@@ -43,6 +45,18 @@ OUTPUT_TABLE_PNG = "outputs/figures/test_accuracy_bestmodel_table.png"
 OUTPUT_TABLE_CSV = "outputs/figures/test_accuracy_bestmodel_table.csv"
 
 os.makedirs(os.path.dirname(OUTPUT_PLOT), exist_ok=True)
+
+
+# ── Command-line arguments ──────────────────────────────────────────────────
+parser = argparse.ArgumentParser(
+    description="Make accuracy table and visualization for the best test model."
+)
+parser.add_argument(
+    "--add-title",
+    action="store_true",
+    help="Show title and subtitle on top of the plot and table.",
+)
+args = parser.parse_args()
 
 
 # ── LULC class names ─────────────────────────────────────────────────────────
@@ -293,12 +307,13 @@ ax.set_xlabel("LULC Class", fontsize=12)
 ax.set_ylim(0, 105)
 ax.grid(axis="y", linestyle="--", alpha=0.35)
 
-ax.set_title(
-    "Producer's Accuracy, User's Accuracy, and F1-score — Best Test Model\n"
-    f"Best Model: {best_model}, Feature Set: {best_feature_set}, Overall Accuracy: {overall_accuracy * 100:.2f}%",
-    fontsize=13,
-    pad=14,
-)
+if args.add_title:
+    ax.set_title(
+        "Producer's Accuracy, User's Accuracy, and F1-score — Best Test Model\n"
+        f"Best Model: {best_model}, Feature Set: {best_feature_set}, Overall Accuracy: {overall_accuracy * 100:.2f}%",
+        fontsize=13,
+        pad=14,
+    )
 
 ax.legend(
     loc="upper center",
@@ -346,13 +361,13 @@ fig_height = max(6, 0.45 * len(display_df) + 2)
 fig, ax = plt.subplots(figsize=(16, fig_height))
 ax.axis("off")
 
-title = (
-    "Accuracy Assessment Table — Best Test Model\n"
-    f"Best Model: {best_model} | Feature Set: {best_feature_set} | "
-    f"Overall Accuracy: {overall_accuracy * 100:.2f}%"
-)
-
-ax.set_title(title, fontsize=14, pad=18)
+if args.add_title:
+    title = (
+        "Accuracy Assessment Table — Best Test Model\n"
+        f"Best Model: {best_model} | Feature Set: {best_feature_set} | "
+        f"Overall Accuracy: {overall_accuracy * 100:.2f}%"
+    )
+    ax.set_title(title, fontsize=14, pad=18)
 
 table = ax.table(
     cellText=display_df.values,
