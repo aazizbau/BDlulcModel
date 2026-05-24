@@ -14,10 +14,18 @@ Inputs
 Outputs
 -------
 - outputs/figures/lulc_change_2017vs2024_sankey_sundarbans.png
+- outputs/figures/lulc_change_2017vs2024_sundarbans.csv
 
 Example
 -------
 python scripts/visualization/visualize_sundarbans_lulc_change_sankey.py
+
+Complete Example Run
+--------------------
+python scripts/visualization/visualize_sundarbans_lulc_change_sankey.py \
+    --add-title \
+    --output-plot outputs/figures/lulc_change_2017vs2024_sankey_sundarbans.png \
+    --output-csv outputs/figures/lulc_change_2017vs2024_sundarbans.csv
 """
 
 from __future__ import annotations
@@ -41,8 +49,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TRANSITION = Path("outputs/inference/change_analysis/transition_code_2017_to_2024.tif")
 DEFAULT_SUNDARBANS_MAP = Path("assets/maps/sundarbans.gpkg")
 DEFAULT_PALETTE = Path("assets/color_palette_coastal_lulc.json")
+DEFAULT_OUTPUT_PLOT = Path("outputs/figures/lulc_change_2017vs2024_sankey_sundarbans.png")
+DEFAULT_OUTPUT_CSV = Path("outputs/figures/lulc_change_2017vs2024_sundarbans.csv")
 
 # 10 m × 10 m pixel → 100 m² → 0.0001 km²
+PIXEL_AREA_M2 = 100.0
 PIXEL_AREA_KM2 = 100.0 / 1_000_000.0
 TRANSITION_NODATA = 0
 
@@ -104,8 +115,13 @@ def parse_args() -> argparse.Namespace:
                    help="Sundarbans GeoPackage.")
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE,
                    help="Colour palette JSON.")
-    p.add_argument("--output-dir", type=Path, default=Path("outputs/figures"),
-                   help="Directory for output PNG.")
+    p.add_argument("--add-title", action="store_true",
+                   help="Show title and subtitle on top of the plot.")
+    p.add_argument("--output-plot", type=Path, default=DEFAULT_OUTPUT_PLOT,
+                   help=f"Output plot PNG path. Default: {DEFAULT_OUTPUT_PLOT}")
+    p.add_argument("--output-csv", type=Path, default=DEFAULT_OUTPUT_CSV,
+                   help=f"Output CSV path. Default: {DEFAULT_OUTPUT_CSV}")
+    p.add_argument("--output-dir", type=Path, default=None, help=argparse.SUPPRESS)
     return p.parse_args()
 
 
@@ -155,6 +171,57 @@ def build_transition_df(counts: dict[tuple[int, int], int]) -> pd.DataFrame:
         if rows
         else pd.DataFrame(columns=["class_2017", "class_2024", "area_km2"])
     )
+
+
+def build_analysis_csv_df(counts: dict[tuple[int, int], int]) -> pd.DataFrame:
+    total_pixels = sum(counts.values())
+    from_totals = {
+        class_id: sum(count for (c17, _), count in counts.items() if c17 == class_id)
+        for class_id in CLASS_ORDER
+    }
+    to_totals = {
+        class_id: sum(count for (_, c24), count in counts.items() if c24 == class_id)
+        for class_id in CLASS_ORDER
+    }
+
+    rows = []
+    for c17 in CLASS_ORDER:
+        for c24 in CLASS_ORDER:
+            pixel_count = counts.get((c17, c24), 0)
+            area_m2 = pixel_count * PIXEL_AREA_M2
+            area_km2 = pixel_count * PIXEL_AREA_KM2
+            from_total = from_totals[c17]
+            to_total = to_totals[c24]
+
+            rows.append(
+                {
+                    "region": "Sundarbans",
+                    "from_class_2017": c17,
+                    "from_class_name_2017": CLASS_NAMES[c17],
+                    "to_class_2024": c24,
+                    "to_class_name_2024": CLASS_NAMES[c24],
+                    "transition_code_2017_2024": f"{c17}_{c24}",
+                    "transition_label_2017_2024": f"{CLASS_NAMES[c17]} -> {CLASS_NAMES[c24]}",
+                    "transition_type": "stable" if c17 == c24 else "changed",
+                    "pixel_count": pixel_count,
+                    "area_m2": area_m2,
+                    "area_ha": area_m2 / 10_000.0,
+                    "area_km2": area_km2,
+                    "percent_of_total_area": (pixel_count / total_pixels * 100.0) if total_pixels else 0.0,
+                    "percent_of_2017_class_area": (pixel_count / from_total * 100.0) if from_total else 0.0,
+                    "percent_of_2024_class_area": (pixel_count / to_total * 100.0) if to_total else 0.0,
+                    "total_pixel_count": total_pixels,
+                    "total_area_m2": total_pixels * PIXEL_AREA_M2,
+                    "total_area_ha": total_pixels * PIXEL_AREA_M2 / 10_000.0,
+                    "total_area_km2": total_pixels * PIXEL_AREA_KM2,
+                    "from_class_total_pixel_count_2017": from_total,
+                    "from_class_total_area_km2_2017": from_total * PIXEL_AREA_KM2,
+                    "to_class_total_pixel_count_2024": to_total,
+                    "to_class_total_area_km2_2024": to_total * PIXEL_AREA_KM2,
+                }
+            )
+
+    return pd.DataFrame(rows)
 
 
 # ── Sankey drawing ────────────────────────────────────────────────────────────
@@ -209,6 +276,7 @@ def save_sankey(
     title: str,
     out_path: Path,
     palette: dict,
+    add_title: bool,
 ) -> None:
     if df.empty or df["area_km2"].sum() <= 0:
         print(f"  No data — skipping {out_path.name}")
@@ -340,7 +408,8 @@ def save_sankey(
             ha="center", va="bottom", fontsize=YEAR_LABEL_FONTSIZE, fontweight="bold", color=tc)
     ax.text((xr0 + xr1) / 2, 1.050, "2024",
             ha="center", va="bottom", fontsize=YEAR_LABEL_FONTSIZE, fontweight="bold", color=tc)
-    ax.set_title(title, fontsize=TITLE_FONTSIZE, color=tc, pad=24)
+    if add_title:
+        ax.set_title(title, fontsize=TITLE_FONTSIZE, color=tc, pad=24)
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.04, 1.12)
     ax.axis("off")
@@ -357,7 +426,12 @@ def main() -> None:
     args = parse_args()
     transition_path = resolve_path(args.transition)
     sundarbans_path = resolve_path(args.sundarbans_map)
-    output_dir = resolve_path(args.output_dir)
+    output_plot = resolve_path(
+        args.output_plot
+        if args.output_dir is None
+        else args.output_dir / DEFAULT_OUTPUT_PLOT.name
+    )
+    output_csv = resolve_path(args.output_csv)
 
     if not transition_path.exists():
         raise FileNotFoundError(f"Transition raster not found: {transition_path}")
@@ -379,11 +453,16 @@ def main() -> None:
         print("Counting Sundarbans transitions...")
         counts = count_transitions_region(ds, geoms)
 
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    build_analysis_csv_df(counts).to_csv(output_csv, index=False)
+    print(f"  Saved CSV: {output_csv}")
+
     save_sankey(
         build_transition_df(counts),
         "Bangladesh Coastal LULC Change: 2017 → 2024  —  Sundarbans",
-        output_dir / "lulc_change_2017vs2024_sankey_sundarbans.png",
+        output_plot,
         palette,
+        args.add_title,
     )
 
 
