@@ -149,7 +149,7 @@ test_acc = cm.diagonal().sum() / cm.sum()
 print(f"Recomputed test accuracy: {test_acc:.4f} ({test_acc * 100:.2f}%)")
 
 # ── Plot ─────────────────────────────────────────────────────────────────────
-cmap = LinearSegmentedColormap.from_list("bw_blue", ["#ffffff", "#1565C0"])
+cmap = LinearSegmentedColormap.from_list("bw_bottle_green", ["#ffffff", "#006A4E"])
 
 fig_width = max(12, n * 1.15)
 fig_height = max(7, n * 0.75)
