@@ -44,6 +44,7 @@ python scripts/parcels/make_infer_parcels_lulc.py \
 
 python scripts/parcels/make_infer_parcels_lulc.py \
     --year 2017 \
+    --seed 40 \
     --upazila-parcels betagi \
     --scalebar-x-frac 0.15 \
     --scalebar-y-frac -0.05 \
@@ -66,6 +67,24 @@ python scripts/parcels/make_infer_parcels_lulc.py \
     --legend-y-frac -0.05 \
     --zoom-inset-x-frac 0.70 \
     --zoom-inset-y-frac 0.52
+
+Complete Example Run
+--------------------
+python scripts/parcels/make_infer_parcels_lulc.py \
+    --year 2017 \
+    --seed 42 \
+    --upazila-parcels amtali \
+    --add-title \
+    --output-plot outputs/figures/amtali_parcels_lulc_2017.png \
+    --output-gpkg assets/maps/amtali_parcels_lulc_2017.gpkg \
+    --scalebar-x-frac 0.07 \
+    --scalebar-y-frac -0.05 \
+    --north-arrow-x-frac 0.97 \
+    --north-arrow-y-frac 0.90 \
+    --legend-x-frac 1.05 \
+    --legend-y-frac -0.06 \
+    --zoom-inset-x-frac 0.15 \
+    --zoom-inset-y-frac 0.60
 """
 
 from __future__ import annotations
@@ -202,8 +221,20 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--parcels", type=Path, default=None, help="Optional parcel GPKG override.")
     p.add_argument("--north-arrow", type=Path, default=DEFAULT_NORTH_ARROW, help="North arrow SVG path.")
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
-    p.add_argument("--output-gpkg", type=Path, default=None, help="Output parcel GPKG path.")
-    p.add_argument("--output-png", type=Path, default=None, help="Output figure PNG path.")
+    p.add_argument("--add-title", action="store_true", help="Show title and subtitle on top of the plot.")
+    p.add_argument(
+        "--output-plot",
+        type=Path,
+        default=None,
+        help="Output figure PNG path. Default: outputs/figures/<upazila>_parcels_lulc_<year>.png",
+    )
+    p.add_argument(
+        "--output-gpkg",
+        type=Path,
+        default=None,
+        help="Output parcel GPKG path. Default: assets/maps/<upazila>_parcels_lulc_<year>.gpkg",
+    )
+    p.add_argument("--output-png", type=Path, default=None, help=argparse.SUPPRESS)
     p.add_argument("--scalebar-x-frac", type=float, default=SCALEBAR_X_FRAC, help="Scale bar x position in axes fraction.")
     p.add_argument("--scalebar-y-frac", type=float, default=SCALEBAR_Y_FRAC, help="Scale bar y position in axes fraction.")
     p.add_argument("--north-arrow-x-frac", type=float, default=NORTH_ARROW_X_FRAC, help="North arrow x position in axes fraction.")
@@ -588,7 +619,7 @@ def main() -> None:
     north_arrow = resolve_path(args.north_arrow)
     palette_path = resolve_path(args.palette)
     output_gpkg = resolve_path(args.output_gpkg or default_output_gpkg(args.year, args.upazila_parcels))
-    output_png = resolve_path(args.output_png or default_output_png(args.year, args.upazila_parcels))
+    output_png = resolve_path(args.output_plot or args.output_png or default_output_png(args.year, args.upazila_parcels))
     scalebar_x_frac = args.scalebar_x_frac
     scalebar_y_frac = args.scalebar_y_frac
     north_arrow_x_frac = args.north_arrow_x_frac
@@ -700,9 +731,10 @@ def main() -> None:
     add_graticule(ax, color=grid_color, src_crs=raster_crs)
     set_geographic_aspect(ax, bounds, raster_crs)
 
-    title = f"{args.upazila_parcels.title()} Parcel LULC {args.year}"
-    title_text = ax.set_title(title, fontsize=15, pad=12, color=title_color, fontweight="bold")
-    title_text.set_path_effects([pe.Stroke(linewidth=2, foreground=fig_bg), pe.Normal()])
+    if args.add_title:
+        title = f"{args.upazila_parcels.title()} Parcel LULC {args.year}"
+        title_text = ax.set_title(title, fontsize=15, pad=12, color=title_color, fontweight="bold")
+        title_text.set_path_effects([pe.Stroke(linewidth=2, foreground=fig_bg), pe.Normal()])
     ax.set_xlabel("Longitude", fontsize=12, color=title_color, labelpad=LONGITUDE_LABEL_PAD)
     ax.set_ylabel("Latitude", fontsize=12, color=title_color)
     ax.tick_params(axis="both", colors=title_color)
