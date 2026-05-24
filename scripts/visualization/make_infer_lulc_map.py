@@ -12,11 +12,20 @@ Inputs
 Output
 ------
 - outputs/figures/bd_coastal_infer_lulc_<year>.png
+- outputs/figures/bd_coastal_infer_lulc_<year>.csv
 
 Example
 -------
 python scripts/visualization/make_infer_lulc_map.py \
     --year 2017
+
+Complete Example Run
+--------------------
+python scripts/visualization/make_infer_lulc_map.py \
+    --year 2017 \
+    --add-title \
+    --output-plot outputs/figures/bd_coastal_infer_lulc_2017.png \
+    --output-csv outputs/figures/bd_coastal_infer_lulc_2017.csv
 """
 
 from __future__ import annotations
@@ -31,7 +40,10 @@ import matplotlib.colors as mcolors
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import rasterio
+from rasterio.errors import WindowError
+from rasterio.features import geometry_mask, geometry_window
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.patches import Patch, Rectangle
 from matplotlib.ticker import FuncFormatter, MaxNLocator
@@ -125,6 +137,10 @@ def default_output_path(year: int) -> Path:
     return DEFAULT_OUTPUT_ROOT / f"bd_coastal_infer_lulc_{year}.png"
 
 
+def default_output_csv_path(year: int) -> Path:
+    return DEFAULT_OUTPUT_ROOT / f"bd_coastal_infer_lulc_{year}.csv"
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Make inferred LULC map for a target year.")
     p.add_argument("--year", type=int, required=True, help="Target year, e.g. 2017 or 2024.")
@@ -133,7 +149,20 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--sundarbans-map", type=Path, default=DEFAULT_SUNDARBANS_MAP, help="Sundarbans vector layer.")
     p.add_argument("--north-arrow", type=Path, default=DEFAULT_NORTH_ARROW, help="North arrow SVG path.")
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
-    p.add_argument("--output", type=Path, default=None, help="Output PNG path.")
+    p.add_argument("--output", type=Path, default=None, help=argparse.SUPPRESS)
+    p.add_argument("--add-title", action="store_true", help="Show title and subtitle on top of the plot.")
+    p.add_argument(
+        "--output-plot",
+        type=Path,
+        default=None,
+        help="Output PNG path. Default: outputs/figures/bd_coastal_infer_lulc_<year>.png",
+    )
+    p.add_argument(
+        "--output-csv",
+        type=Path,
+        default=None,
+        help="Output CSV path. Default: outputs/figures/bd_coastal_infer_lulc_<year>.csv",
+    )
     return p.parse_args()
 
 
@@ -277,6 +306,78 @@ def class_raster_to_rgb(arr: np.ndarray, nodata_rgb: tuple[float, float, float])
     return rgb
 
 
+def compute_zone_lulc_stats(
+    ds: rasterio.io.DatasetReader,
+    zones: gpd.GeoDataFrame,
+    year: int,
+) -> pd.DataFrame:
+    crs = CRS.from_user_input(ds.crs)
+    pixel_area = abs(ds.transform.a * ds.transform.e)
+    pixel_area_m2 = pixel_area if crs.is_projected else np.nan
+    rows = []
+
+    for _, row in zones.iterrows():
+        geom = row.geometry
+        if geom is None or geom.is_empty:
+            continue
+
+        zone_key = str(row["zone"]).strip().lower()
+        zone_name = ZONE_LABELS.get(zone_key, zone_key.title())
+
+        try:
+            window = geometry_window(ds, [geom])
+        except WindowError:
+            class_counts = {}
+        else:
+            data = ds.read(1, window=window, masked=False)
+            mask = geometry_mask(
+                [geom],
+                out_shape=data.shape,
+                transform=ds.window_transform(window),
+                invert=True,
+            )
+            valid = mask & (data != CLASS_NODATA)
+            values, counts = np.unique(data[valid], return_counts=True)
+            class_counts = {
+                int(value): int(count)
+                for value, count in zip(values, counts)
+                if int(value) in LULC_NAMES
+            }
+
+        zone_pixel_count = sum(class_counts.values())
+        zone_area_m2 = zone_pixel_count * pixel_area_m2 if np.isfinite(pixel_area_m2) else np.nan
+        zone_geom_area_m2 = geom.area if crs.is_projected else np.nan
+
+        for class_id in range(1, 11):
+            pixel_count = class_counts.get(class_id, 0)
+            area_m2 = pixel_count * pixel_area_m2 if np.isfinite(pixel_area_m2) else np.nan
+            percent = (pixel_count / zone_pixel_count * 100.0) if zone_pixel_count else 0.0
+
+            rows.append(
+                {
+                    "year": year,
+                    "zone": zone_key,
+                    "zone_name": zone_name,
+                    "class_id": class_id,
+                    "class_name": LULC_NAMES[class_id],
+                    "pixel_count": pixel_count,
+                    "area_m2": area_m2,
+                    "area_ha": area_m2 / 10000.0 if np.isfinite(area_m2) else np.nan,
+                    "area_km2": area_m2 / 1_000_000.0 if np.isfinite(area_m2) else np.nan,
+                    "percent_of_zone_lulc_area": percent,
+                    "zone_lulc_pixel_count": zone_pixel_count,
+                    "zone_lulc_area_m2": zone_area_m2,
+                    "zone_lulc_area_ha": zone_area_m2 / 10000.0 if np.isfinite(zone_area_m2) else np.nan,
+                    "zone_lulc_area_km2": zone_area_m2 / 1_000_000.0 if np.isfinite(zone_area_m2) else np.nan,
+                    "zone_geometry_area_m2": zone_geom_area_m2,
+                    "zone_geometry_area_ha": zone_geom_area_m2 / 10000.0 if np.isfinite(zone_geom_area_m2) else np.nan,
+                    "zone_geometry_area_km2": zone_geom_area_m2 / 1_000_000.0 if np.isfinite(zone_geom_area_m2) else np.nan,
+                }
+            )
+
+    return pd.DataFrame(rows)
+
+
 def legend_handles() -> list[Patch]:
     return [
         Patch(facecolor=LULC_COLORS[class_id], edgecolor="#314245", label=LULC_NAMES[class_id])
@@ -291,7 +392,8 @@ def main() -> None:
     sundarbans_map = resolve_path(args.sundarbans_map)
     north_arrow = resolve_path(args.north_arrow)
     palette_path = resolve_path(args.palette)
-    output = resolve_path(args.output or default_output_path(args.year))
+    output_plot = resolve_path(args.output_plot or args.output or default_output_path(args.year))
+    output_csv = resolve_path(args.output_csv or default_output_csv_path(args.year))
 
     palette = load_palette(palette_path)
     colors = palette["colors"]
@@ -332,6 +434,13 @@ def main() -> None:
     if sundarbans.crs is None:
         raise ValueError("Sundarbans vector has no CRS.")
     sundarbans = sundarbans.to_crs(raster_crs)
+
+    with rasterio.open(input_raster) as ds:
+        stats_df = compute_zone_lulc_stats(ds, zones, args.year)
+
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    stats_df.to_csv(output_csv, index=False)
+    print(f"Saved CSV: {output_csv}")
 
     fig, ax = plt.subplots(figsize=FIGSIZE, dpi=FIG_DPI, facecolor=fig_bg)
     ax.set_facecolor(sea_color)
@@ -404,8 +513,9 @@ def main() -> None:
     set_geographic_aspect(ax, bounds)
     add_graticule(ax, color=grid_color, src_crs=raster_crs)
 
-    title = MAP_TITLE_TEMPLATE.format(year=args.year)
-    ax.set_title(title, fontsize=15, pad=12, color=main_text_color, fontweight="bold")
+    if args.add_title:
+        title = MAP_TITLE_TEMPLATE.format(year=args.year)
+        ax.set_title(title, fontsize=15, pad=12, color=main_text_color, fontweight="bold")
     ax.set_xlabel("Longitude", fontsize=12, color=main_text_color, labelpad=LONGITUDE_LABEL_PAD)
     ax.set_ylabel("Latitude", fontsize=12, color=main_text_color)
     ax.tick_params(axis="both", colors=main_text_color)
@@ -435,11 +545,11 @@ def main() -> None:
         spine.set_linewidth(1.0)
         spine.set_edgecolor(main_text_color)
 
-    output.parent.mkdir(parents=True, exist_ok=True)
+    output_plot.parent.mkdir(parents=True, exist_ok=True)
     plt.tight_layout(rect=(0, TIGHT_LAYOUT_BOTTOM, 1, 1))
-    plt.savefig(output, dpi=FIG_DPI, bbox_inches="tight", facecolor=fig_bg)
+    plt.savefig(output_plot, dpi=FIG_DPI, bbox_inches="tight", facecolor=fig_bg)
     plt.close(fig)
-    print(f"Saved: {output}")
+    print(f"Saved: {output_plot}")
 
 
 if __name__ == "__main__":
