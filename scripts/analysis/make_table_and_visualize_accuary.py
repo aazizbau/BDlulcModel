@@ -293,26 +293,39 @@ bar_width = 0.25
 
 fig, ax = plt.subplots(figsize=(15, 7))
 
-ax.bar(
+producer_bars = ax.bar(
     x - bar_width,
     producer_accuracy * 100,
     width=bar_width,
     label="Producer's Accuracy / Recall",
 )
 
-ax.bar(
+user_bars = ax.bar(
     x,
     user_accuracy * 100,
     width=bar_width,
     label="User's Accuracy / Precision",
 )
 
-ax.bar(
+f1_bars = ax.bar(
     x + bar_width,
     f1_score * 100,
     width=bar_width,
     label="F1-score",
 )
+
+for bars in [producer_bars, user_bars, f1_bars]:
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            height + 1.0,
+            f"{height:.1f}%",
+            ha="center",
+            va="bottom",
+            fontsize=7,
+            rotation=90,
+        )
 
 ax.axhline(
     overall_accuracy * 100,
