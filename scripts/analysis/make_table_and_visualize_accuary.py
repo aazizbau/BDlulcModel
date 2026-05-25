@@ -41,6 +41,7 @@ import textwrap
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
 
 
 # ── Paths ────────────────────────────────────────────────────────────────────
@@ -324,7 +325,7 @@ for bars in [producer_bars, user_bars, f1_bars]:
             ha="center",
             va="bottom",
             fontsize=7,
-            rotation=90,
+            path_effects=[pe.Stroke(linewidth=2.2, foreground="0.90"), pe.Stroke(linewidth=0.8, foreground="0.15"), pe.Normal()],
         )
 
 ax.axhline(
