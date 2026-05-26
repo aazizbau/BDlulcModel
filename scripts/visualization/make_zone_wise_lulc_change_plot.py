@@ -14,7 +14,15 @@ Output
 Example
 -------
 python scripts/visualization/make_zone_wise_lulc_change_plot.py \
-    --zone western
+    --zone western \
+    --add-title
+
+Complete Example Run
+--------------------
+python scripts/visualization/make_zone_wise_lulc_change_plot.py \
+    --zone western \
+    --add-title \
+    --outptut-plot outputs/figures/western_zone_lulc_area_2017_vs_2024.png
 """
 
 from __future__ import annotations
@@ -68,7 +76,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--zone", required=True, choices=ZONE_CHOICES, help="Coastal zone to plot.")
     parser.add_argument("--csv-2017", type=Path, default=DEFAULT_CSV_2017, help="2017 LULC area CSV.")
     parser.add_argument("--csv-2024", type=Path, default=DEFAULT_CSV_2024, help="2024 LULC area CSV.")
-    parser.add_argument("--output-plot", type=Path, default=None, help="Optional output PNG path.")
+    parser.add_argument(
+        "--output-plot",
+        "--outptut-plot",
+        dest="output_plot",
+        type=Path,
+        default=None,
+        help="Output PNG path. Default: outputs/figures/<zone>_zone_lulc_area_2017_vs_2024.png",
+    )
+    parser.add_argument("--add-title", action="store_true", help="Show title on top of the plot.")
     return parser.parse_args()
 
 
@@ -119,13 +135,14 @@ def main() -> None:
     add_bar_labels(ax, bars_2017)
     add_bar_labels(ax, bars_2024)
 
-    ax.set_title(f"Major LULC Class Areas in the {ZONE_TITLES[args.zone]}, 2017 and 2024", fontsize=14, pad=14)
+    if args.add_title:
+        ax.set_title(f"Major LULC Class Areas in the {ZONE_TITLES[args.zone]}, 2017 and 2024", fontsize=14, pad=14)
     ax.set_ylabel("Area (km²)", fontsize=12)
     ax.set_xlabel("LULC class", fontsize=12)
     ax.set_xticks(x)
     ax.set_xticklabels([CLASS_LABELS[c] for c in MAJOR_CLASS_ORDER], rotation=30, ha="right")
     ax.grid(axis="y", alpha=0.35)
-    ax.legend(title="Year")
+    ax.legend(title="Year", fontsize=12, title_fontsize=12)
 
     max_height = max(float(area_2017.max()), float(area_2024.max()), 1.0)
     ax.set_ylim(0, max_height * 1.12)
