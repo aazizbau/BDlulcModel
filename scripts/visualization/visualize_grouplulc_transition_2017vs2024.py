@@ -14,11 +14,18 @@ Inputs
 Outputs
 -------
 - outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive.png
-- outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive_stats.json
+- outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive.csv
 
 Example
 -------
 python scripts/visualization/visualize_grouplulc_transition_2017vs2024.py
+
+Complete Example Run
+--------------------
+python scripts/visualization/visualize_grouplulc_transition_2017vs2024.py \
+    --add-title \
+    --outptut-plot outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive.png \
+    --output-csv outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive.csv
 """
 
 from __future__ import annotations
@@ -61,7 +68,7 @@ DEFAULT_SUNDARBANS_MAP = Path("assets/maps/sundarbans.gpkg")
 DEFAULT_NORTH_ARROW = Path("assets/maps/NorthArrow.svg")
 DEFAULT_PALETTE = Path("assets/color_palette_coastal_lulc.json")
 DEFAULT_OUTPUT = Path("outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive.png")
-DEFAULT_STATS = Path("outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive_stats.json")
+DEFAULT_OUTPUT_CSV = Path("outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive.csv")
 DEFAULT_TOTAL_CSV = Path("outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive_total.csv")
 DEFAULT_ZONEWISE_CSV = Path("outputs/figures/lulc_transition_2017_vs_2024_grouped_mutually_exclusive_zonewise.csv")
 
@@ -141,10 +148,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sundarbans-map", type=Path, default=DEFAULT_SUNDARBANS_MAP, help="Sundarbans vector layer.")
     parser.add_argument("--north-arrow", type=Path, default=DEFAULT_NORTH_ARROW, help="North arrow SVG path.")
     parser.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="Output PNG path.")
-    parser.add_argument("--stats-json", type=Path, default=DEFAULT_STATS, help="Output JSON stats path.")
-    parser.add_argument("--total-csv", type=Path, default=DEFAULT_TOTAL_CSV, help="Output CSV path for total grouped analysis.")
-    parser.add_argument("--zonewise-csv", type=Path, default=DEFAULT_ZONEWISE_CSV, help="Output CSV path for zone-wise grouped analysis.")
+    parser.add_argument("--add-title", action="store_true", help="Show title on top of the plot.")
+    parser.add_argument(
+        "--output-plot",
+        "--outptut-plot",
+        "--output",
+        dest="output_plot",
+        type=Path,
+        default=DEFAULT_OUTPUT,
+        help=f"Output PNG path. Default: {DEFAULT_OUTPUT}",
+    )
+    parser.add_argument(
+        "--output-csv",
+        type=Path,
+        default=DEFAULT_OUTPUT_CSV,
+        help=f"Output CSV path. Default: {DEFAULT_OUTPUT_CSV}",
+    )
+    parser.add_argument("--total-csv", type=Path, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--zonewise-csv", type=Path, default=None, help=argparse.SUPPRESS)
     parser.add_argument("--title", default=MAP_TITLE, help="Map title.")
     return parser.parse_args()
 
@@ -461,15 +482,11 @@ def main() -> None:
     sundarbans_map = resolve_path(args.sundarbans_map)
     north_arrow = resolve_path(args.north_arrow)
     palette_path = resolve_path(args.palette)
-    output_path = resolve_path(args.output)
-    stats_path = resolve_path(args.stats_json)
-    total_csv_path = resolve_path(args.total_csv)
-    zonewise_csv_path = resolve_path(args.zonewise_csv)
+    output_path = resolve_path(args.output_plot)
+    output_csv_path = resolve_path(args.output_csv)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    stats_path.parent.mkdir(parents=True, exist_ok=True)
-    total_csv_path.parent.mkdir(parents=True, exist_ok=True)
-    zonewise_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    output_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
     palette = load_palette(palette_path)
     colors = palette["colors"]
@@ -499,20 +516,6 @@ def main() -> None:
     grouped = assign_group_mutually_exclusive(from_class, to_class, nodata_mask)
 
     px_area_km2 = pixel_area_km2(transform)
-    stats = {
-        "input": str(input_path),
-        "output_png": str(output_path),
-        "raster_profile": {
-            "width": int(profile["width"]),
-            "height": int(profile["height"]),
-            "crs": str(profile["crs"]),
-            "nodata": float(nodata),
-        },
-        "pixel_area_km2": px_area_km2,
-        "group_definitions": {str(k): v for k, v in GROUP_INFO.items()},
-        "group_stats": compute_group_stats(grouped, px_area_km2),
-        "class_names": CLASS_NAMES,
-    }
 
     with rasterio.open(input_path) as src:
         preview = read_downsampled_raster_windowed(src, MAX_DISPLAY_SIZE, DISPLAY_CHUNK_SIZE)
@@ -623,7 +626,8 @@ def main() -> None:
 
     set_geographic_aspect(ax, bounds)
     add_graticule(ax, color=grid_color, src_crs=raster_crs)
-    ax.set_title(args.title, fontsize=15, pad=12, color=main_text_color, fontweight="bold")
+    if args.add_title:
+        ax.set_title(args.title, fontsize=15, pad=12, color=main_text_color, fontweight="bold")
     ax.set_xlabel("Longitude", fontsize=12, color=main_text_color, labelpad=LONGITUDE_LABEL_PAD)
     ax.set_ylabel("Latitude", fontsize=12, color=main_text_color)
     ax.tick_params(axis="both", colors=main_text_color)
@@ -663,12 +667,8 @@ def main() -> None:
     plt.savefig(output_path, dpi=FIG_DPI, bbox_inches="tight", facecolor=fig_bg)
     plt.close(fig)
 
-    log(f"Writing stats: {stats_path}")
-    stats_path.write_text(json.dumps(stats, indent=2), encoding="utf-8")
-    log(f"Writing total CSV: {total_csv_path}")
-    write_csv(total_csv_path, total_csv_rows)
-    log(f"Writing zone-wise CSV: {zonewise_csv_path}")
-    write_csv(zonewise_csv_path, zonewise_csv_rows)
+    log(f"Writing CSV: {output_csv_path}")
+    write_csv(output_csv_path, total_csv_rows + zonewise_csv_rows)
     log("Done.")
 
 
