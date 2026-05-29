@@ -19,12 +19,23 @@ Outputs
 - outputs/figures/lulc_transition_2017_vs_2024_map4_water_expansion_erosion.png
 - outputs/figures/lulc_transition_2017_vs_2024_map5_ecological_recovery.png
 - outputs/figures/lulc_transition_2017_vs_2024_map6_ecological_degradation.png
-- outputs/figures/lulc_transition_2017_vs_2024_<map_key>_stats.json
-- outputs/figures/lulc_transition_2017_vs_2024_sixmaps_summary.json
+- outputs/figures/lulc_transition_2017_vs_2024_sixmaps.csv
 
 Example
 -------
 python scripts/visualization/visualize_sixlulc_transition_2017vs2024.py
+
+Complete Example Run
+--------------------
+python scripts/visualization/visualize_sixlulc_transition_2017vs2024.py \
+    --add-title \
+    --outptut-plot-map1 outputs/figures/lulc_transition_2017_vs_2024_map1_urban_infrastructure_expansion.png \
+    --outptut-plot-map2 outputs/figures/lulc_transition_2017_vs_2024_map2_rural_settlement_expansion.png \
+    --outptut-plot-map3 outputs/figures/lulc_transition_2017_vs_2024_map3_productive_land_conversion.png \
+    --outptut-plot-map4 outputs/figures/lulc_transition_2017_vs_2024_map4_water_expansion_erosion.png \
+    --outptut-plot-map5 outputs/figures/lulc_transition_2017_vs_2024_map5_ecological_recovery.png \
+    --outptut-plot-map6 outputs/figures/lulc_transition_2017_vs_2024_map6_ecological_degradation.png \
+    --output-csv outputs/figures/lulc_transition_2017_vs_2024_sixmaps.csv
 """
 
 from __future__ import annotations
@@ -67,6 +78,7 @@ DEFAULT_SUNDARBANS_MAP = Path("assets/maps/sundarbans.gpkg")
 DEFAULT_NORTH_ARROW = Path("assets/maps/NorthArrow.svg")
 DEFAULT_PALETTE = Path("assets/color_palette_coastal_lulc.json")
 DEFAULT_OUTDIR = Path("outputs/figures")
+DEFAULT_OUTPUT_CSV = Path("outputs/figures/lulc_transition_2017_vs_2024_sixmaps.csv")
 
 FIGSIZE = (11, 9)
 FIG_DPI = 300
@@ -151,7 +163,45 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sundarbans-map", type=Path, default=DEFAULT_SUNDARBANS_MAP, help="Sundarbans vector layer.")
     parser.add_argument("--north-arrow", type=Path, default=DEFAULT_NORTH_ARROW, help="North arrow SVG path.")
     parser.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
-    parser.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR, help="Directory for output PNG and JSON files.")
+    parser.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR, help="Directory for output PNG files.")
+    parser.add_argument("--add-title", action="store_true", help="Show title on top of each plot.")
+    parser.add_argument(
+        "--outptut-plot-map1",
+        type=Path,
+        default=None,
+        help="Output PNG path for map 1. Default: outputs/figures/lulc_transition_2017_vs_2024_map1_urban_infrastructure_expansion.png",
+    )
+    parser.add_argument(
+        "--outptut-plot-map2",
+        type=Path,
+        default=None,
+        help="Output PNG path for map 2. Default: outputs/figures/lulc_transition_2017_vs_2024_map2_rural_settlement_expansion.png",
+    )
+    parser.add_argument(
+        "--outptut-plot-map3",
+        type=Path,
+        default=None,
+        help="Output PNG path for map 3. Default: outputs/figures/lulc_transition_2017_vs_2024_map3_productive_land_conversion.png",
+    )
+    parser.add_argument(
+        "--outptut-plot-map4",
+        type=Path,
+        default=None,
+        help="Output PNG path for map 4. Default: outputs/figures/lulc_transition_2017_vs_2024_map4_water_expansion_erosion.png",
+    )
+    parser.add_argument(
+        "--outptut-plot-map5",
+        type=Path,
+        default=None,
+        help="Output PNG path for map 5. Default: outputs/figures/lulc_transition_2017_vs_2024_map5_ecological_recovery.png",
+    )
+    parser.add_argument(
+        "--outptut-plot-map6",
+        type=Path,
+        default=None,
+        help="Output PNG path for map 6. Default: outputs/figures/lulc_transition_2017_vs_2024_map6_ecological_degradation.png",
+    )
+    parser.add_argument("--output-csv", type=Path, default=DEFAULT_OUTPUT_CSV, help=f"Output CSV path. Default: {DEFAULT_OUTPUT_CSV}")
     return parser.parse_args()
 
 
@@ -525,6 +575,7 @@ def render_single(
     legend_face: str,
     sundarbans: gpd.GeoDataFrame,
     sundarbans_text_color: str,
+    add_title: bool,
 ) -> None:
     rgb = render_rgb(arr, focus_color=focus_color, sea_color=sea_color)
 
@@ -598,7 +649,8 @@ def render_single(
 
     set_geographic_aspect(ax, bounds)
     add_graticule(ax, color=grid_color, src_crs=raster_crs)
-    ax.set_title(title, fontsize=15, pad=12, color=main_text_color, fontweight="bold")
+    if add_title:
+        ax.set_title(title, fontsize=15, pad=12, color=main_text_color, fontweight="bold")
     ax.set_xlabel("Longitude", fontsize=12, color=main_text_color, labelpad=LONGITUDE_LABEL_PAD)
     ax.set_ylabel("Latitude", fontsize=12, color=main_text_color)
     ax.tick_params(axis="both", colors=main_text_color)
@@ -647,8 +699,20 @@ def main() -> None:
     north_arrow = resolve_path(args.north_arrow)
     palette_path = resolve_path(args.palette)
     outdir = resolve_path(args.outdir)
+    output_csv = resolve_path(args.output_csv)
+    output_png_paths = {
+        "map1_urban_infrastructure_expansion": resolve_path(args.outptut_plot_map1 or outdir / "lulc_transition_2017_vs_2024_map1_urban_infrastructure_expansion.png"),
+        "map2_rural_settlement_expansion": resolve_path(args.outptut_plot_map2 or outdir / "lulc_transition_2017_vs_2024_map2_rural_settlement_expansion.png"),
+        "map3_productive_land_conversion": resolve_path(args.outptut_plot_map3 or outdir / "lulc_transition_2017_vs_2024_map3_productive_land_conversion.png"),
+        "map4_water_expansion_erosion": resolve_path(args.outptut_plot_map4 or outdir / "lulc_transition_2017_vs_2024_map4_water_expansion_erosion.png"),
+        "map5_ecological_recovery": resolve_path(args.outptut_plot_map5 or outdir / "lulc_transition_2017_vs_2024_map5_ecological_recovery.png"),
+        "map6_ecological_degradation": resolve_path(args.outptut_plot_map6 or outdir / "lulc_transition_2017_vs_2024_map6_ecological_degradation.png"),
+    }
 
     outdir.mkdir(parents=True, exist_ok=True)
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    for output_png_path in output_png_paths.values():
+        output_png_path.parent.mkdir(parents=True, exist_ok=True)
 
     palette = load_palette(palette_path)
     colors = palette["colors"]
@@ -729,23 +793,10 @@ def main() -> None:
     preview_from, preview_to = decode_transition(preview)
     preview_maps = build_maps(preview_from, preview_to, preview_nodata)
 
-    master_summary = {
-        "input": str(input_path),
-        "pixel_area_km2": px_area_km2,
-        "raster_profile": {
-            "width": int(profile["width"]),
-            "height": int(profile["height"]),
-            "crs": str(profile["crs"]),
-            "nodata": float(nodata),
-        },
-        "outputs": {},
-    }
+    all_csv_rows: list[dict[str, object]] = []
 
     for key, spec in MAP_SPECS.items():
-        png_path = outdir / f"lulc_transition_2017_vs_2024_{key}.png"
-        json_path = outdir / f"lulc_transition_2017_vs_2024_{key}_stats.json"
-        total_csv_path = outdir / f"lulc_transition_2017_vs_2024_{key}_total.csv"
-        zonewise_csv_path = outdir / f"lulc_transition_2017_vs_2024_{key}_zonewise.csv"
+        png_path = output_png_paths[key]
         log(f"Rendering {key}: {png_path}")
         render_single(
             preview_maps[key],
@@ -768,9 +819,8 @@ def main() -> None:
             legend_face=legend_face,
             sundarbans=sundarbans,
             sundarbans_text_color=sundarbans_text_color,
+            add_title=args.add_title,
         )
-        stats = compute_stats_from_counter(stats_counters[key], px_area_km2, spec["label"])
-        json_path.write_text(json.dumps(stats, indent=2), encoding="utf-8")
         total_rows = counter_rows(
             stats_counters[key],
             px_area_km2=px_area_km2,
@@ -793,19 +843,10 @@ def main() -> None:
                     zone_label=str(record["zone_label"]),
                 )
             )
-        write_csv(total_csv_path, total_rows)
-        write_csv(zonewise_csv_path, zonewise_rows)
-        master_summary["outputs"][key] = {
-            "png": str(png_path),
-            "stats_json": str(json_path),
-            "total_csv": str(total_csv_path),
-            "zonewise_csv": str(zonewise_csv_path),
-            "focus_label": spec["label"],
-        }
+        all_csv_rows.extend(total_rows + zonewise_rows)
 
-    master_json = outdir / "lulc_transition_2017_vs_2024_sixmaps_summary.json"
-    master_json.write_text(json.dumps(master_summary, indent=2), encoding="utf-8")
-    log(f"Wrote summary: {master_json}")
+    log(f"Writing CSV: {output_csv}")
+    write_csv(output_csv, all_csv_rows)
     log("Done.")
 
 
