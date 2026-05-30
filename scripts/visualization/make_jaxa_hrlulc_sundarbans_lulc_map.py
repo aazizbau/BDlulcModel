@@ -17,7 +17,7 @@ Example
 -------
 python scripts/visualization/make_jaxa_hrlulc_sundarbans_lulc_map.py --year 2023
 python scripts/visualization/make_jaxa_hrlulc_sundarbans_lulc_map.py --year 2023 \
-    --buffer-top 1000 --buffer-bottom 10000 --buffer-left 10000 --buffer-right 10000
+    --buffer-top 1000 --buffer-bottom 21500 --buffer-left 10000 --buffer-right 10000
 
 Complete Example Run
 --------------------
@@ -26,7 +26,7 @@ python scripts/visualization/make_jaxa_hrlulc_sundarbans_lulc_map.py \
     --add-title \
     --outptut-plot outputs/figures/sundarbans_jaxa_hrlulc_2023.png \
     --buffer-top 1000 \
-    --buffer-bottom 10000 \
+    --buffer-bottom 21500 \
     --buffer-left 10000 \
     --buffer-right 10000
 """
