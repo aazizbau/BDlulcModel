@@ -18,10 +18,21 @@ Outputs
 - outputs/figures/lulc_change_2017vs2024_sankey_western_zone.png
 - outputs/figures/lulc_change_2017vs2024_sankey_central_zone.png
 - outputs/figures/lulc_change_2017vs2024_sankey_eastern_zone.png
+- outputs/figures/lulc_change_2017vs2024_sankey.csv
 
 Example
 -------
 python scripts/visualization/visualize_lulc_change_sankey.py
+
+Complete Example Run
+--------------------
+python scripts/visualization/visualize_lulc_change_sankey.py \
+    --add-title \
+    --outptut-plot-overall outputs/figures/lulc_change_2017vs2024_sankey_overall.png \
+    --outptut-plot-western outputs/figures/lulc_change_2017vs2024_sankey_western_zone.png \
+    --outptut-plot-central outputs/figures/lulc_change_2017vs2024_sankey_central_zone.png \
+    --outptut-plot-eastern outputs/figures/lulc_change_2017vs2024_sankey_eastern_zone.png \
+    --output-csv outputs/figures/lulc_change_2017vs2024_sankey.csv
 """
 
 from __future__ import annotations
@@ -45,8 +56,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TRANSITION = Path("outputs/inference/change_analysis/transition_code_2017_to_2024.tif")
 DEFAULT_ZONE_MAP = Path("assets/maps/bd_coastal_zones.gpkg")
 DEFAULT_PALETTE = Path("assets/color_palette_coastal_lulc.json")
+DEFAULT_OUTPUT_DIR = Path("outputs/figures")
+DEFAULT_OUTPUT_CSV = Path("outputs/figures/lulc_change_2017vs2024_sankey.csv")
 
 # 10 m × 10 m pixel → 100 m² → 0.0001 km²
+PIXEL_AREA_M2 = 100.0
 PIXEL_AREA_KM2 = 100.0 / 1_000_000.0
 TRANSITION_NODATA = 0
 
@@ -121,8 +135,20 @@ def parse_args() -> argparse.Namespace:
                    help="Coastal zones GeoPackage.")
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE,
                    help="Colour palette JSON.")
-    p.add_argument("--output-dir", type=Path, default=Path("outputs/figures"),
+    p.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR,
                    help="Directory for output PNGs.")
+    p.add_argument("--add-title", action="store_true",
+                   help="Show title on top of each plot.")
+    p.add_argument("--outptut-plot-overall", type=Path, default=None,
+                   help="Output PNG path for overall Sankey. Default: outputs/figures/lulc_change_2017vs2024_sankey_overall.png")
+    p.add_argument("--outptut-plot-western", type=Path, default=None,
+                   help="Output PNG path for western zone Sankey. Default: outputs/figures/lulc_change_2017vs2024_sankey_western_zone.png")
+    p.add_argument("--outptut-plot-central", type=Path, default=None,
+                   help="Output PNG path for central zone Sankey. Default: outputs/figures/lulc_change_2017vs2024_sankey_central_zone.png")
+    p.add_argument("--outptut-plot-eastern", type=Path, default=None,
+                   help="Output PNG path for eastern zone Sankey. Default: outputs/figures/lulc_change_2017vs2024_sankey_eastern_zone.png")
+    p.add_argument("--output-csv", type=Path, default=DEFAULT_OUTPUT_CSV,
+                   help=f"Output CSV path. Default: {DEFAULT_OUTPUT_CSV}")
     return p.parse_args()
 
 
@@ -181,6 +207,60 @@ def build_transition_df(counts: dict[tuple[int, int], int]) -> pd.DataFrame:
     )
 
 
+def build_analysis_csv_rows(
+    counts: dict[tuple[int, int], int],
+    scope_key: str,
+    scope_label: str,
+) -> list[dict[str, object]]:
+    total_pixels = sum(counts.values())
+    from_totals = {
+        class_id: sum(count for (c17, _), count in counts.items() if c17 == class_id)
+        for class_id in CLASS_ORDER
+    }
+    to_totals = {
+        class_id: sum(count for (_, c24), count in counts.items() if c24 == class_id)
+        for class_id in CLASS_ORDER
+    }
+
+    rows: list[dict[str, object]] = []
+    for c17 in CLASS_ORDER:
+        for c24 in CLASS_ORDER:
+            pixel_count = counts.get((c17, c24), 0)
+            area_m2 = pixel_count * PIXEL_AREA_M2
+            area_km2 = pixel_count * PIXEL_AREA_KM2
+            from_total = from_totals[c17]
+            to_total = to_totals[c24]
+            rows.append(
+                {
+                    "scope_key": scope_key,
+                    "scope_label": scope_label,
+                    "from_class_2017": c17,
+                    "from_class_name_2017": CLASS_NAMES[c17],
+                    "to_class_2024": c24,
+                    "to_class_name_2024": CLASS_NAMES[c24],
+                    "transition_code_2017_2024": f"{c17}_{c24}",
+                    "transition_label_2017_2024": f"{CLASS_NAMES[c17]} -> {CLASS_NAMES[c24]}",
+                    "transition_type": "stable" if c17 == c24 else "changed",
+                    "pixel_count": pixel_count,
+                    "area_m2": area_m2,
+                    "area_ha": area_m2 / 10_000.0,
+                    "area_km2": area_km2,
+                    "percent_of_scope_area": (pixel_count / total_pixels * 100.0) if total_pixels else 0.0,
+                    "percent_of_2017_class_area": (pixel_count / from_total * 100.0) if from_total else 0.0,
+                    "percent_of_2024_class_area": (pixel_count / to_total * 100.0) if to_total else 0.0,
+                    "scope_total_pixel_count": total_pixels,
+                    "scope_total_area_m2": total_pixels * PIXEL_AREA_M2,
+                    "scope_total_area_ha": total_pixels * PIXEL_AREA_M2 / 10_000.0,
+                    "scope_total_area_km2": total_pixels * PIXEL_AREA_KM2,
+                    "from_class_total_pixel_count_2017": from_total,
+                    "from_class_total_area_km2_2017": from_total * PIXEL_AREA_KM2,
+                    "to_class_total_pixel_count_2024": to_total,
+                    "to_class_total_area_km2_2024": to_total * PIXEL_AREA_KM2,
+                }
+            )
+    return rows
+
+
 # ── Sankey drawing ────────────────────────────────────────────────────────────
 
 def _sankey_patch(
@@ -233,6 +313,7 @@ def save_sankey(
     title: str,
     out_path: Path,
     palette: dict,
+    add_title: bool,
 ) -> None:
     if df.empty or df["area_km2"].sum() <= 0:
         print(f"  No data — skipping {out_path.name}")
@@ -340,7 +421,8 @@ def save_sankey(
             ha="center", va="bottom", fontsize=YEAR_LABEL_FONTSIZE, fontweight="bold", color=tc)
     ax.text((xr0 + xr1) / 2, 1.050, "2024",
             ha="center", va="bottom", fontsize=YEAR_LABEL_FONTSIZE, fontweight="bold", color=tc)
-    ax.set_title(title, fontsize=TITLE_FONTSIZE, color=tc, pad=24)
+    if add_title:
+        ax.set_title(title, fontsize=TITLE_FONTSIZE, color=tc, pad=24)
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.04, 1.12)
     ax.axis("off")
@@ -358,6 +440,13 @@ def main() -> None:
     transition_path = resolve_path(args.transition)
     zone_map_path = resolve_path(args.zone_map)
     output_dir = resolve_path(args.output_dir)
+    output_csv = resolve_path(args.output_csv)
+    output_paths = {
+        "overall": resolve_path(args.outptut_plot_overall or output_dir / OUTPUT_NAMES["overall"]),
+        "western": resolve_path(args.outptut_plot_western or output_dir / OUTPUT_NAMES["western"]),
+        "central": resolve_path(args.outptut_plot_central or output_dir / OUTPUT_NAMES["central"]),
+        "eastern": resolve_path(args.outptut_plot_eastern or output_dir / OUTPUT_NAMES["eastern"]),
+    }
 
     if not transition_path.exists():
         raise FileNotFoundError(f"Transition raster not found: {transition_path}")
@@ -366,6 +455,7 @@ def main() -> None:
 
     palette = load_palette(args.palette)
     zones = gpd.read_file(zone_map_path)
+    csv_rows: list[dict[str, object]] = []
 
     with rasterio.open(transition_path) as ds:
         zones = zones.to_crs(ds.crs)
@@ -385,11 +475,21 @@ def main() -> None:
             print(f"Counting {ZONE_LABELS[key]} transitions...")
             zone_counts[key] = count_transitions_zone(ds, geoms)
 
+    csv_rows.extend(build_analysis_csv_rows(overall_counts, "overall", "All Zones"))
+    for key in ["western", "central", "eastern"]:
+        if key in zone_counts:
+            csv_rows.extend(build_analysis_csv_rows(zone_counts[key], key, ZONE_LABELS[key]))
+
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(csv_rows).to_csv(output_csv, index=False)
+    print(f"  Saved CSV: {output_csv}")
+
     save_sankey(
         build_transition_df(overall_counts),
         "Bangladesh Coastal LULC Change: 2017 → 2024  (All Zones)",
-        output_dir / OUTPUT_NAMES["overall"],
+        output_paths["overall"],
         palette,
+        args.add_title,
     )
 
     for key in ["western", "central", "eastern"]:
@@ -398,8 +498,9 @@ def main() -> None:
         save_sankey(
             build_transition_df(zone_counts[key]),
             f"Bangladesh Coastal LULC Change: 2017 → 2024  —  {ZONE_LABELS[key]}",
-            output_dir / OUTPUT_NAMES[key],
+            output_paths[key],
             palette,
+            args.add_title,
         )
 
 
