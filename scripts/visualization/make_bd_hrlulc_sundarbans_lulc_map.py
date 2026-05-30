@@ -18,6 +18,17 @@ Example
 python scripts/visualization/make_bd_hrlulc_sundarbans_lulc_map.py --year 2023
 python scripts/visualization/make_bd_hrlulc_sundarbans_lulc_map.py --year 2023 \
     --buffer-top 1000 --buffer-bottom 10000 --buffer-left 10000 --buffer-right 10000
+
+Complete Example Run
+--------------------
+python scripts/visualization/make_bd_hrlulc_sundarbans_lulc_map.py \
+    --year 2023 \
+    --add-title \
+    --outptut-plot outputs/figures/sundarbans_bd_hrlulc_2023.png \
+    --buffer-top 1000 \
+    --buffer-bottom 10000 \
+    --buffer-left 10000 \
+    --buffer-right 10000
 """
 
 from __future__ import annotations
@@ -146,7 +157,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--sundarbans-map", type=Path, default=DEFAULT_SUNDARBANS_MAP, help="Sundarbans vector layer.")
     p.add_argument("--north-arrow", type=Path, default=DEFAULT_NORTH_ARROW, help="North arrow SVG path.")
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
-    p.add_argument("--output", type=Path, default=None, help="Output PNG path.")
+    p.add_argument("--add-title", action="store_true", help="Show title on top of the plot.")
+    p.add_argument(
+        "--outptut-plot",
+        type=Path,
+        default=None,
+        help="Output PNG path. Default: outputs/figures/sundarbans_bd_hrlulc_<year>.png",
+    )
+    p.add_argument("--output", type=Path, default=None, help=argparse.SUPPRESS)
     p.add_argument("--buffer-top", type=float, default=BUFFER_TOP_M,
                    help="Buffer north of Sundarbans in metres. Default: 1000.")
     p.add_argument("--buffer-bottom", type=float, default=BUFFER_BOTTOM_M,
@@ -338,7 +356,7 @@ def main() -> None:
     sundarbans_map = resolve_path(args.sundarbans_map)
     north_arrow = resolve_path(args.north_arrow)
     palette_path = resolve_path(args.palette)
-    output = resolve_path(args.output or default_output_path(args.year))
+    output = resolve_path(args.outptut_plot or args.output or default_output_path(args.year))
 
     palette = load_palette(palette_path)
     colors = palette["colors"]
@@ -450,8 +468,9 @@ def main() -> None:
 
     add_graticule(ax, color=grid_color, src_crs=raster_crs)
 
-    title = MAP_TITLE_TEMPLATE.format(year=args.year)
-    ax.set_title(title, fontsize=15, pad=12, color=main_text_color, fontweight="bold")
+    if args.add_title:
+        title = MAP_TITLE_TEMPLATE.format(year=args.year)
+        ax.set_title(title, fontsize=15, pad=12, color=main_text_color, fontweight="bold")
     ax.set_xlabel("Longitude", fontsize=12, color=main_text_color, labelpad=LONGITUDE_LABEL_PAD)
     ax.set_ylabel("Latitude", fontsize=12, color=main_text_color)
     ax.tick_params(axis="both", colors=main_text_color)
