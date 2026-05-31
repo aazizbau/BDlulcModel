@@ -17,6 +17,15 @@ Example
 -------
 python scripts/visualization/visualize_parcel_lulc_change_2017vs2024.py \
     --upazila bamna
+
+Complete Example Run
+--------------------
+python scripts/visualization/visualize_parcel_lulc_change_2017vs2024.py \
+    --upazila bamna \
+    --add-title \
+    --outptut-plot-bar outputs/figures/bamna_parcel_lulc_area_bar_2017_vs_2024.png \
+    --outptut-plot-sankey outputs/figures/bamna_parcel_lulc_transition_sankey_2017_vs_2024.png \
+    --outptut-plot-facetedbar outputs/figures/bamna_parcel_lulc_parceltype_faceted_bar_2017_vs_2024.png
 """
 
 from __future__ import annotations
@@ -91,6 +100,25 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--input", type=Path, default=None, help="Optional CSV override.")
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Project palette JSON.")
     p.add_argument("--facet-top-n", type=int, default=12, help="Number of parcel types to show in faceted charts.")
+    p.add_argument("--add-title", action="store_true", help="Show title on plots.")
+    p.add_argument(
+        "--outptut-plot-bar",
+        type=Path,
+        default=None,
+        help="Output bar plot path. Default: outputs/figures/<upazila>_parcel_lulc_area_bar_2017_vs_2024.png",
+    )
+    p.add_argument(
+        "--outptut-plot-sankey",
+        type=Path,
+        default=None,
+        help="Output Sankey plot path. Default: outputs/figures/<upazila>_parcel_lulc_transition_sankey_2017_vs_2024.png",
+    )
+    p.add_argument(
+        "--outptut-plot-facetedbar",
+        type=Path,
+        default=None,
+        help="Output faceted bar plot path. Default: outputs/figures/<upazila>_parcel_lulc_parceltype_faceted_bar_2017_vs_2024.png",
+    )
     return p.parse_args()
 
 
@@ -148,7 +176,7 @@ def style_axis(ax, palette: dict, grid_axis: str = "y") -> None:
         ax.set_axisbelow(True)
 
 
-def save_area_bar_chart(df: pd.DataFrame, upazila: str, order: list[str], palette: dict) -> Path:
+def save_area_bar_chart(df: pd.DataFrame, upazila: str, order: list[str], palette: dict, output: Path, add_title: bool) -> Path:
     area_2017 = df.groupby("lulc_name_2017")[AREA_COL].sum().reindex(order, fill_value=0)
     area_2024 = df.groupby("lulc_name_2024")[AREA_COL].sum().reindex(order, fill_value=0)
 
@@ -162,7 +190,8 @@ def save_area_bar_chart(df: pd.DataFrame, upazila: str, order: list[str], palett
     ax.set_xticks(x)
     ax.set_xticklabels(order, rotation=35, ha="right", color=palette["deep_slate"])
     ax.set_ylabel("Total area (m²)", color=palette["deep_slate"])
-    ax.set_title(f"{upazila.title()} parcel LULC area comparison: 2017 vs 2024", color=palette["deep_slate"])
+    if add_title:
+        ax.set_title(f"{upazila.title()} parcel LULC area comparison: 2017 vs 2024", color=palette["deep_slate"])
     leg = ax.legend(frameon=False)
     for txt in leg.get_texts():
         txt.set_color(palette["deep_slate"])
@@ -170,7 +199,7 @@ def save_area_bar_chart(df: pd.DataFrame, upazila: str, order: list[str], palett
     style_axis(ax, palette, grid_axis="y")
 
     fig.tight_layout()
-    out = resolve_path(output_path(upazila, "area_bar"))
+    out = resolve_path(output)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight", facecolor=palette["sand"])
     plt.close(fig)
@@ -231,7 +260,7 @@ def adjust_positions(y_values: list[float], min_gap: float = 0.04, y_min: float 
     return [max(y_min, min(y, y_max)) for y in adjusted]
 
 
-def save_sankey(df: pd.DataFrame, upazila: str, order: list[str], palette: dict) -> Path:
+def save_sankey(df: pd.DataFrame, upazila: str, order: list[str], palette: dict, output: Path, add_title: bool) -> Path:
     trans = df.groupby(["lulc_name_2017", "lulc_name_2024"])[AREA_COL].sum().reset_index()
     total_area = trans[AREA_COL].sum()
     if total_area <= 0:
@@ -352,19 +381,20 @@ def save_sankey(df: pd.DataFrame, upazila: str, order: list[str], palette: dict)
 
     ax.text((x_left0 + x_left1) / 2, 1.035, "2017", ha="center", va="bottom", fontsize=13, fontweight="bold", color=palette["deep_slate"])
     ax.text((x_right0 + x_right1) / 2, 1.035, "2024", ha="center", va="bottom", fontsize=13, fontweight="bold", color=palette["deep_slate"])
-    ax.set_title(f"{upazila.title()} parcel LULC transition flow (share of total area)", fontsize=14, color=palette["deep_slate"])
+    if add_title:
+        ax.set_title(f"{upazila.title()} parcel LULC transition flow (share of total area)", fontsize=14, color=palette["deep_slate"])
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.02, 1.06)
     ax.axis("off")
 
-    out = resolve_path(output_path(upazila, "transition_sankey"))
+    out = resolve_path(output)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight", facecolor=palette["sand"])
     plt.close(fig)
     return out
 
 
-def save_faceted_bar(df: pd.DataFrame, upazila: str, order: list[str], top_n: int, palette: dict) -> Path:
+def save_faceted_bar(df: pd.DataFrame, upazila: str, order: list[str], top_n: int, palette: dict, output: Path, add_title: bool) -> Path:
     df_plot = df.copy()
     df_plot["L_NAME_En_plot"] = df_plot["L_NAME_En"].replace({"Khal": "Canal", "Halot": "Road"})
 
@@ -405,11 +435,12 @@ def save_faceted_bar(df: pd.DataFrame, upazila: str, order: list[str], top_n: in
     leg = fig.legend(handles, labels, loc="upper right", ncol=2, frameon=False)
     for txt in leg.get_texts():
         txt.set_color(palette["deep_slate"])
-    fig.suptitle(f"{upazila.title()} parcel-type faceted LULC area comparison: 2017 vs 2024", y=0.995, fontsize=15, color=palette["deep_slate"])
+    if add_title:
+        fig.suptitle(f"{upazila.title()} parcel-type faceted LULC area comparison: 2017 vs 2024", y=0.995, fontsize=15, color=palette["deep_slate"])
     fig.text(0.02, 0.5, "Area (m²)", va="center", rotation=90, color=palette["deep_slate"])
     fig.tight_layout(rect=(0.03, 0.03, 1, 0.97))
 
-    out = resolve_path(output_path(upazila, "parceltype_faceted_bar"))
+    out = resolve_path(output)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight", facecolor=palette["sand"])
     plt.close(fig)
@@ -425,11 +456,14 @@ def main() -> None:
     palette = load_palette(args.palette)
     df = load_csv(input_path)
     order = class_order_from_df(df)
+    output_bar = args.outptut_plot_bar or output_path(args.upazila, "area_bar")
+    output_sankey = args.outptut_plot_sankey or output_path(args.upazila, "transition_sankey")
+    output_facetedbar = args.outptut_plot_facetedbar or output_path(args.upazila, "parceltype_faceted_bar")
 
     outputs = [
-        save_area_bar_chart(df, args.upazila, order, palette),
-        save_sankey(df, args.upazila, order, palette),
-        save_faceted_bar(df, args.upazila, order, args.facet_top_n, palette),
+        save_area_bar_chart(df, args.upazila, order, palette, output_bar, args.add_title),
+        save_sankey(df, args.upazila, order, palette, output_sankey, args.add_title),
+        save_faceted_bar(df, args.upazila, order, args.facet_top_n, palette, output_facetedbar, args.add_title),
     ]
 
     for out in outputs:
