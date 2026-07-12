@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
-from shapely.geometry import MultiPolygon, Polygon
+from shapely.geometry import GeometryCollection, MultiPolygon, Polygon
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -29,7 +29,7 @@ def resolve_path(path: Path) -> Path:
     return path if path.is_absolute() else PROJECT_ROOT / path
 
 
-def remove_polygon_holes(geometry):
+def polygon_exteriors_only(geometry):
     """
     Retain only polygon exterior rings.
 
@@ -45,6 +45,20 @@ def remove_polygon_holes(geometry):
         return MultiPolygon(
             [Polygon(polygon.exterior) for polygon in geometry.geoms]
         )
+
+    if isinstance(geometry, GeometryCollection):
+        polygons = []
+        for part in geometry.geoms:
+            cleaned = polygon_exteriors_only(part)
+            if isinstance(cleaned, Polygon):
+                polygons.append(cleaned)
+            elif isinstance(cleaned, MultiPolygon):
+                polygons.extend(cleaned.geoms)
+        if not polygons:
+            return geometry
+        if len(polygons) == 1:
+            return polygons[0]
+        return MultiPolygon(polygons)
 
     return geometry
 
@@ -62,7 +76,7 @@ def create_dissolved_boundary(
     output_epsg: int,
     name: str,
     layer: str | None = None,
-    remove_holes: bool = False,
+    keep_holes: bool = False,
 ) -> None:
     """Read, dissolve, reproject, and export the input vector data."""
 
@@ -94,8 +108,8 @@ def create_dissolved_boundary(
 
     dissolved_geometry = gdf.geometry.union_all()
 
-    if remove_holes:
-        dissolved_geometry = remove_polygon_holes(dissolved_geometry)
+    if not keep_holes:
+        dissolved_geometry = polygon_exteriors_only(dissolved_geometry)
 
     output_gdf = gpd.GeoDataFrame(
         {"name": [name]},
@@ -168,9 +182,9 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--remove-holes",
+        "--keep-holes",
         action="store_true",
-        help="Remove interior polygon holes and retain only exterior rings.",
+        help="Keep interior holes. By default, holes are removed for a clean outer boundary.",
     )
 
     return parser.parse_args()
@@ -189,7 +203,7 @@ def main() -> int:
             output_epsg=args.output_epsg,
             name=name,
             layer=args.layer,
-            remove_holes=args.remove_holes,
+            keep_holes=args.keep_holes,
         )
     except Exception as error:
         print(f"Error: {error}", file=sys.stderr)
