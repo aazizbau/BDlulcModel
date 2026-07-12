@@ -532,6 +532,12 @@ def apply_lonlat_dm_formatters(ax, src_crs: CRS, extent: Tuple[float, float, flo
     ax.yaxis.set_major_formatter(FuncFormatter(fmt_y))
 
 
+def keep_two_extent_ticks(ax, extent: Tuple[float, float, float, float]) -> None:
+    xmin, xmax, ymin, ymax = extent
+    ax.set_xticks([xmin, xmax])
+    ax.set_yticks([ymin, ymax])
+
+
 def set_geographic_aspect(ax, extent: Tuple[float, float, float, float], crs: CRS) -> None:
     _, _, ymin, ymax = extent
     if "4326" in crs.to_string() or getattr(crs, "is_geographic", False):
@@ -872,6 +878,7 @@ def main() -> None:
     ax_zoom.set_ylim(zoom_extent[2], zoom_extent[3])
     set_geographic_aspect(ax_zoom, zoom_extent, full_crs)
     apply_lonlat_dm_formatters(ax_zoom, full_crs, zoom_extent)
+    keep_two_extent_ticks(ax_zoom, zoom_extent)
     ax_zoom.set_title("(b) Zoomed split blocks", fontsize=13, pad=8)
     ax_zoom.set_xlabel("Longitude")
     if not args.no_grid:
