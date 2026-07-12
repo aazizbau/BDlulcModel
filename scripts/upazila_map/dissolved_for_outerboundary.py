@@ -2,8 +2,8 @@
 """
 Create a dissolved outer-boundary GeoPackage from an input vector file.
 
-The output contains one dissolved geometry and a name field with the value
-"mapura" by default.
+The output contains one dissolved geometry and a name field inferred from the
+input filename by default, for example "manpura" from "manpura_landuse.gpkg".
 
 Complete example run:
     python scripts/upazila_map/dissolved_for_outerboundary.py \
@@ -47,6 +47,13 @@ def remove_polygon_holes(geometry):
         )
 
     return geometry
+
+
+def infer_name_from_input(input_vector: Path) -> str:
+    stem = input_vector.stem
+    if stem.endswith("_landuse"):
+        return stem[: -len("_landuse")]
+    return stem
 
 
 def create_dissolved_boundary(
@@ -147,8 +154,11 @@ def parse_arguments() -> argparse.Namespace:
 
     parser.add_argument(
         "--name",
-        default="mapura",
-        help='Value written to the output "name" field (default: mapura).',
+        default=None,
+        help=(
+            'Value written to the output "name" field. By default, inferred '
+            'from --input-vector, e.g. "manpura" from "manpura_landuse.gpkg".'
+        ),
     )
 
     parser.add_argument(
@@ -168,13 +178,16 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_arguments()
+    input_vector = resolve_path(args.input_vector)
+    output_vector = resolve_path(args.output_vector)
+    name = args.name or infer_name_from_input(input_vector)
 
     try:
         create_dissolved_boundary(
-            input_vector=resolve_path(args.input_vector),
-            output_vector=resolve_path(args.output_vector),
+            input_vector=input_vector,
+            output_vector=output_vector,
             output_epsg=args.output_epsg,
-            name=args.name,
+            name=name,
             layer=args.layer,
             remove_holes=args.remove_holes,
         )
