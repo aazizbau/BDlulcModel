@@ -86,6 +86,7 @@ EDGE_COLOR = "#263238"
 GRID_COLOR = "#263238"
 ZONE_TEXT_COLOR = "#263238"
 SUNDARBANS_TEXT_COLOR = "#263238"
+UPAZILA_TEXT_COLOR = "#8B1E3F"
 BAY_TEXT_COLOR = "#2F6F7E"
 
 UPAZILA_COLORS = {
@@ -350,7 +351,7 @@ def main() -> None:
             fontweight="bold",
             ha="center",
             va="center",
-            color=ZONE_TEXT_COLOR,
+            color=UPAZILA_TEXT_COLOR,
             zorder=9,
         )
         txt.set_path_effects([pe.Stroke(linewidth=3, foreground=FIG_BG), pe.Normal()])
