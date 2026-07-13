@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Create a coastal Bangladesh study-area map with:
-- ALOS DEM binned elevation color relief blended with hillshade
+- ALOS DSM binned elevation color relief blended with hillshade
 - Coastal zone boundaries and labels
 - Sundarbans boundary and label
 - Bay of Bengal halo label
@@ -19,15 +19,15 @@ Inputs
 
 Output
 ------
-- outputs/figures/study_area_with_zones_n_dem.png
+- outputs/figures/study_area_with_zones_n_alos_dsm.png
 
 Example
 -------
-python scripts/visualization/make_study_area_with_zones_n_dem.py \
+python scripts/visualization/make_study_area_with_zones_n_alos_dsm.py \
     --zone-map assets/maps/bd_coastal_zones.gpkg \
     --dem-data assets/maps/alos_bd_coastal_dem.tif \
     --add-title \
-    --output outputs/figures/study_area_with_zones_n_dem.png
+    --output outputs/figures/study_area_with_zones_n_alos_dsm.png
 """
 
 from __future__ import annotations
@@ -67,13 +67,13 @@ DEFAULT_SUNDARBANS_MAP = Path("assets/maps/sundarbans.gpkg")
 DEFAULT_DEM = Path("assets/maps/alos_bd_coastal_dem.tif")
 DEFAULT_NORTH_ARROW = Path("assets/maps/NorthArrow.svg")
 DEFAULT_PALETTE = Path("assets/color_palette_coastal_lulc.json")
-DEFAULT_OUTPUT = Path("outputs/figures/study_area_with_zones_n_dem.png")
+DEFAULT_OUTPUT = Path("outputs/figures/study_area_with_zones_n_alos_dsm.png")
 
 FIGSIZE = (11, 9)
 FIG_DPI = 300
 MAX_DISPLAY_SIZE = 2800
 DISPLAY_CHUNK_SIZE = 512
-MAP_TITLE = "Bangladesh Coastal Zones and ALOS DEM"
+MAP_TITLE = "Bangladesh Coastal Zones and ALOS DSM"
 X_AXIS_LABEL = "Longitude"
 Y_AXIS_LABEL = "Latitude"
 COLORBAR_LABEL = "Elevation (m)"
@@ -109,10 +109,10 @@ def resolve_path(path: Path) -> Path:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Make study area map with coastal zones and ALOS DEM.")
+    p = argparse.ArgumentParser(description="Make study area map with coastal zones and ALOS DSM.")
     p.add_argument("--zone-map", type=Path, default=DEFAULT_ZONE_MAP, help="Coastal zones vector layer.")
     p.add_argument("--sundarbans-map", type=Path, default=DEFAULT_SUNDARBANS_MAP, help="Sundarbans vector layer.")
-    p.add_argument("--dem-data", type=Path, default=DEFAULT_DEM, help="Clipped DEM raster path.")
+    p.add_argument("--dem-data", type=Path, default=DEFAULT_DEM, help="Clipped ALOS DSM raster path.")
     p.add_argument("--north-arrow", type=Path, default=DEFAULT_NORTH_ARROW, help="North arrow SVG path.")
     p.add_argument("--palette", type=Path, default=DEFAULT_PALETTE, help="Palette JSON path.")
     p.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="Output PNG path.")
@@ -343,9 +343,9 @@ def main() -> None:
 
     with rasterio.open(dem_data) as ds:
         if ds.crs is None:
-            raise ValueError("DEM raster has no CRS.")
+            raise ValueError("ALOS DSM raster has no CRS.")
         if ds.crs.to_string() != TARGET_CRS:
-            raise ValueError(f"DEM raster CRS must be {TARGET_CRS}, found {ds.crs}.")
+            raise ValueError(f"ALOS DSM raster CRS must be {TARGET_CRS}, found {ds.crs}.")
         bounds = ds.bounds
         nodata = ds.nodata
         dem = read_downsampled_raster_windowed(
@@ -359,7 +359,7 @@ def main() -> None:
 
     valid = np.isfinite(dem)
     if not valid.any():
-        raise ValueError("DEM raster contains no finite values.")
+        raise ValueError("ALOS DSM raster contains no finite values.")
     plot_extent = valid_data_extent_from_preview(valid, bounds)
 
     dem_rgb = dem_cmap(dem_norm(np.nan_to_num(dem, nan=DEM_BINS[0])))[..., :3]
