@@ -185,7 +185,6 @@ def add_bar_and_ci_labels(
     for idx, bar in enumerate(bars):
         x = bar.get_x() + bar.get_width() / 2
         value = float(values[idx])
-        lo = float(lower[idx])
         hi = float(upper[idx])
 
         ax.text(
@@ -195,26 +194,6 @@ def add_bar_and_ci_labels(
             ha="center",
             va="bottom",
             fontsize=6.5,
-            path_effects=text_effects,
-            zorder=6,
-        )
-        ax.text(
-            x,
-            max(lo - 1.4, 0.2),
-            f"{lo:.1f}%",
-            ha="center",
-            va="top",
-            fontsize=5.8,
-            path_effects=text_effects,
-            zorder=6,
-        )
-        ax.text(
-            x,
-            min(hi + 0.25, ax.get_ylim()[1] - 0.2),
-            f"{hi:.1f}%",
-            ha="center",
-            va="bottom",
-            fontsize=5.8,
             path_effects=text_effects,
             zorder=6,
         )
