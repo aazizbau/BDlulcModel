@@ -1,0 +1,34 @@
+model_family: fttransformer
+model: FT-Transformer
+feature_set: ae64_plus10indices
+training_script: scripts/training/train_fttransformer_ae64_plus10indices_from_npz.py
+data: /media/abdul-aziz/AAzizSSD/BDlulcModel/data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz
+source_best_run_name: ftt_ae64plus10idx_dt128_blk2_head8_attndo005_ffdo005_lr1e3_bs384_acc4_amp_v5
+source_best_run_dir: runs/ftt_ae64plus10idx_dt128_blk2_head8_attndo005_ffdo005_lr1e3_bs384_acc4_amp_v5
+selection_metric: best_val_macro_f1
+selection_metric_value: 0.7293006664606182
+args:
+  data: /media/abdul-aziz/AAzizSSD/BDlulcModel/data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz
+  outdir: /media/abdul-aziz/AAzizSSD/BDlulcModel/runs/ftt_ae64plus10idx_dt128_blk2_head8_attndo005_ffdo005_lr1e3_bs384_acc4_amp_v5
+  d_token: 128
+  n_blocks: 2
+  n_heads: 8
+  attention_dropout: 0.05
+  ff_dropout: 0.05
+  residual_dropout: 0.0
+  ff_multiplier: 1.3333333333333333
+  batch_size: 384
+  grad_accum_steps: 4
+  epochs: 100
+  lr: 0.001
+  weight_decay: 0.0001
+  patience: 15
+  min_delta: 0.0001
+  label_smoothing: 0.05
+  scheduler: true
+  scheduler_factor: 0.5
+  scheduler_patience: 5
+  eval_every: 1
+  amp: true
+  device: cuda
+  seed: 42

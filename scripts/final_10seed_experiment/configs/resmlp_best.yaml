@@ -1,0 +1,30 @@
+model_family: resmlp
+model: ResMLP
+feature_set: ae64_plus10indices
+training_script: scripts/training/train_resmlp_ae64_plus10indices_from_npz.py
+data: /media/abdul-aziz/AAzizSSD/BDlulcModel/data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz
+source_best_run_name: resmlp_ae64plus10idx_h384-384-192_do03_lr6e4_bs4096_v10
+source_best_run_dir: runs/resmlp_ae64plus10idx_h384-384-192_do03_lr6e4_bs4096_v10
+selection_metric: best_val_macro_f1
+selection_metric_value: 0.7407075614061663
+args:
+  data: /media/abdul-aziz/AAzizSSD/BDlulcModel/data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz
+  outdir: /media/abdul-aziz/AAzizSSD/BDlulcModel/runs/resmlp_ae64plus10idx_h384-384-192_do03_lr6e4_bs4096_v10
+  hidden:
+  - 384
+  - 384
+  - 192
+  dropout: 0.3
+  batch_size: 4096
+  epochs: 120
+  lr: 0.0006
+  weight_decay: 0.0005
+  patience: 20
+  min_delta: 0.0001
+  label_smoothing: 0.1
+  scheduler: true
+  scheduler_factor: 0.5
+  scheduler_patience: 4
+  eval_every: 1
+  device: cuda
+  seed: 42

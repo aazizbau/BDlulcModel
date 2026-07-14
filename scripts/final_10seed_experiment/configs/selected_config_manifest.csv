@@ -1,0 +1,7 @@
+config_path,model_family
+scripts/final_10seed_experiment/configs/cnn1d_best.yaml,cnn1d
+scripts/final_10seed_experiment/configs/fttransformer_best.yaml,fttransformer
+scripts/final_10seed_experiment/configs/lgbm_best.yaml,lgbm
+scripts/final_10seed_experiment/configs/mlp_best.yaml,mlp
+scripts/final_10seed_experiment/configs/resmlp_best.yaml,resmlp
+scripts/final_10seed_experiment/configs/xgboost_best.yaml,xgboost

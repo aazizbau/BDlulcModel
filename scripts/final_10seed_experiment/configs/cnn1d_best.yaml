@@ -1,0 +1,35 @@
+model_family: cnn1d
+model: CNN1D
+feature_set: ae64_plus10indices
+training_script: scripts/training/train_cnn1d_ae64_plus10indices_from_npz.py
+data: /media/abdul-aziz/AAzizSSD/BDlulcModel/data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz
+source_best_run_name: cnn1d_ae64plus10idx_c32-64-128_k7-5-3_h128_do02_lr1e3_bs4096_v2
+source_best_run_dir: runs/cnn1d_ae64plus10idx_c32-64-128_k7-5-3_h128_do02_lr1e3_bs4096_v2
+selection_metric: best_val_macro_f1
+selection_metric_value: 0.6970849735546372
+args:
+  data: /media/abdul-aziz/AAzizSSD/BDlulcModel/data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz
+  outdir: /media/abdul-aziz/AAzizSSD/BDlulcModel/runs/cnn1d_ae64plus10idx_c32-64-128_k7-5-3_h128_do02_lr1e3_bs4096_v2
+  channels:
+  - 32
+  - 64
+  - 128
+  kernels:
+  - 7
+  - 5
+  - 3
+  head_dim: 128
+  dropout: 0.2
+  batch_size: 4096
+  epochs: 100
+  lr: 0.001
+  weight_decay: 0.0001
+  patience: 15
+  min_delta: 0.0001
+  label_smoothing: 0.05
+  scheduler: true
+  scheduler_factor: 0.5
+  scheduler_patience: 5
+  eval_every: 1
+  device: cuda
+  seed: 42

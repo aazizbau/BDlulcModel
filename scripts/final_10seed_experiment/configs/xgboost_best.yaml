@@ -1,0 +1,29 @@
+model_family: xgboost
+model: XGBoost
+feature_set: ae64_plus10indices
+training_script: scripts/training/train_xgboost_ae64_plus10indices_from_npz.py
+data: /media/abdul-aziz/AAzizSSD/BDlulcModel/data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz
+source_best_run_name: xgb_ae64plus10idx_lr0.03_ne5000_md10_mcw3_sub0.8_col0.8_es200_v1
+source_best_run_dir: runs/xgb_ae64plus10idx_lr0.03_ne5000_md10_mcw3_sub0.8_col0.8_es200_v1
+selection_metric: best_val_macro_f1
+selection_metric_value: 0.7334303895257246
+args:
+  data: /media/abdul-aziz/AAzizSSD/BDlulcModel/data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz
+  outdir: /media/abdul-aziz/AAzizSSD/BDlulcModel/runs/xgb_ae64plus10idx_lr0.03_ne5000_md10_mcw3_sub0.8_col0.8_es200_v1
+  learning_rate: 0.03
+  n_estimators: 5000
+  max_depth: 10
+  min_child_weight: 3.0
+  subsample: 0.8
+  colsample_bytree: 0.8
+  gamma: 0.0
+  reg_alpha: 0.0
+  reg_lambda: 1.0
+  max_bin: 256
+  early_stopping_rounds: 200
+  eval_every: 25
+  n_jobs: 16
+  seed: 42
+  tree_method: hist
+  grow_policy: depthwise
+  save_test_preds: true

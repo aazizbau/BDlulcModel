@@ -1,0 +1,32 @@
+model_family: lgbm
+model: LightGBM
+feature_set: ae64_plus10indices
+training_script: scripts/training/train_lgbm_ae64_plus10indices_from_npz.py
+data: /media/abdul-aziz/AAzizSSD/BDlulcModel/data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz
+source_best_run_name: lgbm_ae64plus10idx_lr0.02_ne7000_nl191_mcs100_sub0.75_col0.75_ra0.2_rl1.0_es250_v10
+source_best_run_dir: runs/lgbm_ae64plus10idx_lr0.02_ne7000_nl191_mcs100_sub0.75_col0.75_ra0.2_rl1.0_es250_v10
+selection_metric: best_val_macro_f1
+selection_metric_value: 0.7253770783553386
+args:
+  data: /media/abdul-aziz/AAzizSSD/BDlulcModel/data/processed/training/ae64_plus10indices_samples_4upazila_2023_trainvaltest.npz
+  outdir: /media/abdul-aziz/AAzizSSD/BDlulcModel/runs/lgbm_ae64plus10idx_lr0.02_ne7000_nl191_mcs100_sub0.75_col0.75_ra0.2_rl1.0_es250_v10
+  learning_rate: 0.02
+  n_estimators: 7000
+  num_leaves: 191
+  max_depth: -1
+  min_child_samples: 100
+  subsample: 0.75
+  subsample_freq: 1
+  colsample_bytree: 0.75
+  min_split_gain: 0.0
+  reg_alpha: 0.2
+  reg_lambda: 1.0
+  max_bin: 255
+  early_stopping_rounds: 250
+  eval_every: 25
+  n_jobs: 16
+  seed: 42
+  force_col_wise: true
+  force_row_wise: false
+  deterministic: false
+  save_test_preds: true
