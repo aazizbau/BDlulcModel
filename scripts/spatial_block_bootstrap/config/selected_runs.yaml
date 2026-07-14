@@ -1,0 +1,44 @@
+selection_metric: best_val_macro_f1
+selection_source: /media/abdul-aziz/AAzizSSD/BDlulcModel/outputs/master_training_with_outputs/best_runs_by_group.csv
+model_comparison:
+  CNN1D:
+    run_name: cnn1d_ae64plus10idx_c32-64-128_k7-5-3_h128_do02_lr1e3_bs4096_v2
+    feature_set: AE64_plus10indices
+  FTTransformer:
+    run_name: ftt_ae64plus10idx_dt128_blk2_head8_attndo005_ffdo005_lr1e3_bs384_acc4_amp_v5
+    feature_set: AE64_plus10indices
+  LightGBM:
+    run_name: lgbm_ae64plus10idx_lr0.02_ne7000_nl191_mcs100_sub0.75_col0.75_ra0.2_rl1.0_es250_v10
+    feature_set: AE64_plus10indices
+  MLP:
+    run_name: mlp_ae64plus10idx_h1024-512_do02_lr1e3_bs4096_v9
+    feature_set: AE64_plus10indices
+  ResMLP:
+    run_name: resmlp_ae64plus10idx_h384-384-192_do03_lr6e4_bs4096_v10
+    feature_set: AE64_plus10indices
+  XGBoost:
+    run_name: xgb_ae64plus10idx_lr0.03_ne5000_md10_mcw3_sub0.8_col0.8_es200_v1
+    feature_set: AE64_plus10indices
+featureset_comparison:
+  CNN1D:
+    AE64: cnn1d_ae64_c32-64-128_k7-5-3_h128_do02_lr1e3_bs4096_v2
+    AE64_plus10indices: cnn1d_ae64plus10idx_c32-64-128_k7-5-3_h128_do02_lr1e3_bs4096_v2
+  FTTransformer:
+    AE64: ftt_ae64_dt128_blk2_head8_attndo005_ffdo005_lr1e3_bs512_acc4_amp_v5
+    AE64_plus10indices: ftt_ae64plus10idx_dt128_blk2_head8_attndo005_ffdo005_lr1e3_bs384_acc4_amp_v5
+  LightGBM:
+    AE64: lgbm_ae64_lr0.02_ne7000_nl63_mcs100_sub0.7_col0.7_ra0.5_rl1.0_es250_v10
+    AE64_plus10indices: lgbm_ae64plus10idx_lr0.02_ne7000_nl191_mcs100_sub0.75_col0.75_ra0.2_rl1.0_es250_v10
+  MLP:
+    AE64: mlp_ae64_h768-256_do025_lr1e3_bs4096_wd2e4_ls008_v10
+    AE64_plus10indices: mlp_ae64plus10idx_h1024-512_do02_lr1e3_bs4096_v9
+  ResMLP:
+    AE64: resmlp_ae64_h512-512-256_do03_lr7e4_bs4096_v6
+    AE64_plus10indices: resmlp_ae64plus10idx_h384-384-192_do03_lr6e4_bs4096_v10
+  XGBoost:
+    AE64: xgb_ae64_lr0.03_ne5000_md10_mcw3_sub0.8_col0.8_es200_v1
+    AE64_plus10indices: xgb_ae64plus10idx_lr0.03_ne5000_md10_mcw3_sub0.8_col0.8_es200_v1
+best_overall_model:
+  run_name: mlp_ae64plus10idx_h1024-512_do02_lr1e3_bs4096_v9
+  model_family: MLP
+  feature_set: AE64_plus10indices
