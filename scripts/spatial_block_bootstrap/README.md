@@ -96,7 +96,8 @@ All products are written below `outputs/spatial_block_bootstrap/`:
 
 Parquet is used when a Parquet engine is installed. Otherwise, large tables
 are written as compressed `.csv.gz` files and read transparently by later
-stages.
+stages. The summary XLSX workbook is written without requiring an optional
+Excel package such as `openpyxl`.
 
 ## Interpretation
 

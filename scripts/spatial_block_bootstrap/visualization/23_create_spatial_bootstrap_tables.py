@@ -17,6 +17,7 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PACKAGE_ROOT))
 
 from common.constants import DEFAULT_OUTPUT_ROOT, resolve_path  # noqa: E402
+from common.excel_utils import write_xlsx  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -87,11 +88,15 @@ def main() -> None:
     )
 
     workbook = summary_dir / "spatial_bootstrap_summary.xlsx"
-    with pd.ExcelWriter(workbook, engine="openpyxl") as writer:
-        model.to_excel(writer, sheet_name="Model comparison", index=False)
-        feature.to_excel(writer, sheet_name="Feature comparison", index=False)
-        difference.to_excel(writer, sheet_name="Feature differences", index=False)
-        classwise.to_excel(writer, sheet_name="Best model classwise", index=False)
+    write_xlsx(
+        workbook,
+        {
+            "Model comparison": model,
+            "Feature comparison": feature,
+            "Feature differences": difference,
+            "Best model classwise": classwise,
+        },
+    )
     print(f"Saved: {workbook}")
 
 
