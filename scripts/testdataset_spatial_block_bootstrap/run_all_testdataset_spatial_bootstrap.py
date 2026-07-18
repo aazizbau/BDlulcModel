@@ -35,6 +35,7 @@ STAGES = [
     PACKAGE_ROOT / "visualization" / "21_plot_featureset_comparison_spatial_ci.py",
     PACKAGE_ROOT / "visualization" / "22_plot_bestmodel_classwise_spatial_ci.py",
     SHARED_ROOT / "visualization" / "23_create_spatial_bootstrap_tables.py",
+    PACKAGE_ROOT / "reporting" / "24_create_thesis_results_csv.py",
 ]
 
 

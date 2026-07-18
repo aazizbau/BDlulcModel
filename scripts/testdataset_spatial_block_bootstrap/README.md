@@ -61,6 +61,28 @@ distributions, and validation records are kept under:
 outputs/testdataset_spatial_block_bootstrap/
 ```
 
+The thesis-ready consolidated results are written to:
+
+```text
+outputs/testdataset_spatial_block_bootstrap/summaries/thesis_results_spatial_ci.csv
+```
+
+This CSV includes the selected MLP summary, model-family comparison, paired
+MLP-versus-competitor differences, feature-set comparison, paired feature-set
+effects, and class-wise metrics. For every estimate it reports the lower and
+upper 95% confidence limits, separate lower and upper margins, and the interval
+half-width for compact `estimate +/- margin` reporting. Because spatial
+bootstrap intervals can be asymmetric, the full `(lower, upper)` interval is
+the preferred thesis notation; the `+/-` value is a compact approximation.
+
+To regenerate only this CSV after the bootstrap summaries already exist:
+
+```bash
+python scripts/testdataset_spatial_block_bootstrap/reporting/24_create_thesis_results_csv.py \
+    --output-root outputs/testdataset_spatial_block_bootstrap \
+    --output-csv outputs/testdataset_spatial_block_bootstrap/summaries/thesis_results_spatial_ci.csv
+```
+
 ## Methodological Note
 
 Because the test set is used to select the runs in this workflow, its reported
