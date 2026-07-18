@@ -1,0 +1,53 @@
+selection_metric: test_acc
+selection_source: /media/abdul-aziz/AAzizSSD/BDlulcModel/outputs/master_training_with_outputs/all_master_runs_long.csv
+selection_warning: Test-selected results are descriptive and can be optimistically
+  biased; the test set influenced model selection.
+model_comparison:
+  CNN1D:
+    run_name: cnn1d_ae64plus10idx_c32-64-128_k7-5-3_h128_do02_lr1e3_bs4096_v2
+    feature_set: AE64_plus10indices
+    test_accuracy: 0.7298580657058393
+  FTTransformer:
+    run_name: ftt_ae64_dt128_blk2_head8_attndo005_ffdo005_lr1e3_bs512_acc4_amp_v5
+    feature_set: AE64
+    test_accuracy: 0.7558805985632407
+  LightGBM:
+    run_name: lgbm_ae64plus10idx_lr0.02_ne7000_nl191_mcs100_sub0.75_col0.75_ra0.2_rl1.0_es250_v10
+    feature_set: AE64_plus10indices
+    test_accuracy: 0.7575332361364828
+  MLP:
+    run_name: mlp_ae64plus10idx_h512-256_do03_lr1e3_bs4096_v3
+    feature_set: AE64_plus10indices
+    test_accuracy: 0.7739885092577119
+  ResMLP:
+    run_name: resmlp_ae64plus10idx_h512-512-256_do025_lr8e4_bs4096_v6
+    feature_set: AE64_plus10indices
+    test_accuracy: 0.7682517821023332
+  XGBoost:
+    run_name: xgb_ae64plus10idx_lr0.03_ne5000_md10_mcw3_sub0.8_col0.8_es200_v1
+    feature_set: AE64_plus10indices
+    test_accuracy: 0.766370273899188
+featureset_comparison:
+  CNN1D:
+    AE64: cnn1d_ae64_c32-64-128_k7-5-3_h128_do02_lr1e3_bs4096_v2
+    AE64_plus10indices: cnn1d_ae64plus10idx_c32-64-128_k7-5-3_h128_do02_lr1e3_bs4096_v2
+  FTTransformer:
+    AE64: ftt_ae64_dt128_blk2_head8_attndo005_ffdo005_lr1e3_bs512_acc4_amp_v5
+    AE64_plus10indices: ftt_ae64plus10idx_dt128_blk2_head8_attndo005_ffdo005_lr1e3_bs384_acc4_amp_v5
+  LightGBM:
+    AE64: lgbm_ae64_lr0.03_ne5000_nl127_mcs100_sub0.8_col0.8_ra0.1_rl0.5_es200_v9
+    AE64_plus10indices: lgbm_ae64plus10idx_lr0.02_ne7000_nl191_mcs100_sub0.75_col0.75_ra0.2_rl1.0_es250_v10
+  MLP:
+    AE64: mlp_ae64_h1024-512_do03_lr1e3_bs4096_v5
+    AE64_plus10indices: mlp_ae64plus10idx_h512-256_do03_lr1e3_bs4096_v3
+  ResMLP:
+    AE64: resmlp_ae64_h512-256_do02_lr1e3_bs4096_v1
+    AE64_plus10indices: resmlp_ae64plus10idx_h512-512-256_do025_lr8e4_bs4096_v6
+  XGBoost:
+    AE64: xgb_ae64_lr0.03_ne5000_md12_mcw8_sub0.8_col0.8_g0.2_ra0.1_rl2.0_es200_v9
+    AE64_plus10indices: xgb_ae64plus10idx_lr0.03_ne5000_md10_mcw3_sub0.8_col0.8_es200_v1
+best_overall_model:
+  run_name: mlp_ae64plus10idx_h512-256_do03_lr1e3_bs4096_v3
+  model_family: MLP
+  feature_set: AE64_plus10indices
+  test_accuracy: 0.7739885092577119
