@@ -18,7 +18,8 @@ SHARED_ROOT = Path(__file__).resolve().parents[2] / "spatial_block_bootstrap"
 sys.path.insert(0, str(SHARED_ROOT))
 
 from common.constants import DEFAULT_OUTPUT_ROOT, MODEL_FAMILY_ORDER, resolve_path  # noqa: E402
-from common.plot_utils import add_ci_labels, asymmetric_yerr  # noqa: E402
+from common.plot_utils import asymmetric_yerr  # noqa: E402
+from test_plot_utils import add_ci_labels  # noqa: E402
 
 
 METRIC_ORDER = ["Overall Accuracy", "Macro F1-score", "Weighted F1-score"]

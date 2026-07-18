@@ -18,7 +18,8 @@ SHARED_ROOT = Path(__file__).resolve().parents[2] / "spatial_block_bootstrap"
 sys.path.insert(0, str(SHARED_ROOT))
 
 from common.constants import CLASS_IDS, DEFAULT_OUTPUT_ROOT, resolve_path  # noqa: E402
-from common.plot_utils import add_ci_labels, asymmetric_yerr, wrap_label  # noqa: E402
+from common.plot_utils import asymmetric_yerr, wrap_label  # noqa: E402
+from test_plot_utils import add_ci_labels  # noqa: E402
 
 
 METRICS = [
