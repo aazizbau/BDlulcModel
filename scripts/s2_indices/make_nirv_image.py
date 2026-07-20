@@ -25,6 +25,29 @@ python scripts/s2_indices/make_nirv_image.py \
   --red data/interim/S2_2017_B4_10m_utm46_bdcoastal_solid.tif \
   --nir data/interim/S2_2017_B8_10m_utm46_bdcoastal_solid.tif \
   --output data/interim/bdcoastal_solid_2017_utm46_nirv.tif
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Calculate Sentinel-2 spectral indices from aligned reflectance bands.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--year``, ``--input-dir``, ``--crs``, ``--red``, ``--nir``, ``--output``, ``--input-nodata``, ``--output-nodata``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace band paths with aligned reflectance rasters for the target AOI and keep nodata masks, grid geometry, and scale factors consistent.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

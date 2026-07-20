@@ -1,4 +1,27 @@
 #!/bin/bash
+# ==============================================================================
+# Reproduction and AOI adaptation
+# ==============================================================================
+# Purpose: Run s2 octdec download multiyear multiband.
+# Workflow role: Orchestrate a reproducible project workflow.
+#
+# Prerequisites:
+#   1. Run from the repository root with the project environment activated.
+#   2. Install requirements.txt and any system GDAL/Earth Engine dependencies.
+#   3. Verify every input path and available disk/GPU resources before starting.
+#
+# AOI adaptation:
+#   Replace project-specific paths, AOI settings, years, and output destinations before running.
+#   Keep CRS, resolution, nodata, feature order, class IDs, and split metadata
+#   consistent across all scripts invoked by this runner.
+#
+# Reproducible example:
+#   bash shell_scripts/run_s2_octdec_download_multiyear_multiband.sh
+#
+# Outputs and logs are controlled by the variables below. Use a new output/log
+# location for a new AOI, retain the run manifest, and inspect failures before
+# resuming. Existing usage notes and worked commands below remain authoritative.
+# ==============================================================================
 # ----------------------------------------------------
 # Lab-style Sentinel-2 Oct–Dec download
 # Multi-year, multi-band batch runner

@@ -16,6 +16,35 @@ NPZ input keys expected:
   y_train (N,)  uint8/int  classes 1..K
   X_val   (M,D) float32
   y_val   (M,)  uint8/int  classes 1..K
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Extract spatially split samples, train a classifier, or orchestrate hyperparameter experiments.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--data``, ``--run-name``, ``--out-dir``, ``--epochs``, ``--batch-size``, ``--num-classes``, ``--lr``, ``--weight-decay``, ``--dropout``, ``--hidden``, ``--depth``, ``--no-bn``, ``--label-smoothing``, ``--loss``, ``--focal-gamma``, ``--focal-alpha``, ``--tau``, ``--grad-clip``, ``--num-workers``, ``--amp``, ``--seed``, ``--scheduler``, ``--warmup-epochs``, ``--early-stop-patience``, ``--grid-search``, ``--grid-lr``, ``--grid-wd``, ``--grid-dropout``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace NPZ/raster/vector inputs with samples extracted from the new AOI, preserve spatially disjoint splits, and review class IDs, feature order, block size, budgets, and random seeds.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
+
+Reproducible invocation
+~~~~~~~~~~~~~~~~~~~~~~~
+Inspect the complete interface before supplying AOI-specific paths::
+
+    python scripts/training/train_mlp_ae64_v2.py --help
 """
 
 from __future__ import annotations

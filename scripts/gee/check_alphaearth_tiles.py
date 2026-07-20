@@ -4,6 +4,29 @@ Verify AlphaEarth embedding tile downloads for the Bangladesh coastal AOI.
 Usage:
     python scripts/gee/check_alphaearth_tiles.py \
         --output data/raw/embeddings/bd_coastal_alphaearth_2024.tif
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Acquire or prepare Earth Engine products such as AlphaEarth, Dynamic World, or ALOS DSM data.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--output``, ``--tile-width-km``, ``--tile-height-km``, ``--tile-overlap-km``, ``--project``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace the Earth Engine project, AOI vector or bounds, year, scale, CRS, and export directory. Authenticate the account that owns the target project first.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

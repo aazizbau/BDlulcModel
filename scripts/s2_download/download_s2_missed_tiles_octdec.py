@@ -1,4 +1,34 @@
 #!/usr/bin/env python3
+"""Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Download cloud-screened Sentinel-2 seasonal imagery from Earth Engine.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--year``, ``--band``, ``--aoi``, ``--project``, ``--outdir``, ``--tile-deg``, ``--scale``, ``--crs``, ``--cloud-threshold``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace the Earth Engine project, AOI geometry, years, cloud thresholds, seasonal window, export scale/CRS, and destination directory.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
+
+Reproducible invocation
+~~~~~~~~~~~~~~~~~~~~~~~
+Inspect the complete interface before supplying AOI-specific paths::
+
+    python scripts/s2_download/download_s2_missed_tiles_octdec.py --help
+"""
+
 import argparse
 import os
 import subprocess

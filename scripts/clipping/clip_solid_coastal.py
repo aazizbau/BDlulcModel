@@ -3,6 +3,29 @@ Clip the coastal Sentinel mosaic to the solid coastal AOI using GDAL streaming t
 
 Example:
     python scripts/clipping/clip_solid_coastal.py --year 2017 --band B11
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Clip or reproject raster products to the coastal study boundary and analysis grid.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--year``, ``--band``, ``--base-dir``, ``--resolution``, ``--input``, ``--vector``, ``--output-dir``, ``--output-name``, ``--layer``, ``--cache-mb``, ``--compress``, ``--threads``, ``--block-size``, ``--resampling``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace the boundary vector and source raster paths. Select a projected CRS appropriate for the new AOI before area, distance, or 10 m grid operations.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

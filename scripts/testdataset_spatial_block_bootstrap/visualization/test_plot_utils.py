@@ -1,4 +1,34 @@
-"""Plot-label styling specific to the test-dataset bootstrap figures."""
+"""Plot-label styling specific to the test-dataset bootstrap figures.
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Produce the test-selected spatial-block uncertainty analysis used for descriptive thesis results.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This is an imported helper module rather than a standalone command. Its public functions are exercised by the parent workflow scripts.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Regenerate test-selected run metadata and all block-level predictions for the new AOI. Treat test-selected intervals as descriptive, not unbiased model-selection evidence.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
+
+Reproducible invocation
+~~~~~~~~~~~~~~~~~~~~~~~
+Import this helper from its parent workflow or an interactive check::
+
+    import scripts.testdataset_spatial_block_bootstrap.visualization.test_plot_utils
+"""
 
 from __future__ import annotations
 

@@ -15,6 +15,35 @@ Inputs
 Output
 ------
 - outputs/figures/study_area_map2.png
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Turn prepared rasters, vectors, and tables into thesis-ready figures.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This script has no formal argparse interface; review the documented path constants near the top of the file before execution.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace raster/vector/palette paths with target-AOI products and verify matching CRS, extent, class IDs, units, and map annotations before publication.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
+
+Reproducible invocation
+~~~~~~~~~~~~~~~~~~~~~~~
+After reviewing and adapting the documented path constants, run::
+
+    python scripts/visualization/make_zoomed_study_area_map.py
 """
 
 from __future__ import annotations

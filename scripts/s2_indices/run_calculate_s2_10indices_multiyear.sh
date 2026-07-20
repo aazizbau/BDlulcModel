@@ -1,4 +1,27 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# Reproduction and AOI adaptation
+# ==============================================================================
+# Purpose: Run calculate s2 10indices multiyear.
+# Workflow role: Calculate Sentinel-2 spectral indices from aligned reflectance bands.
+#
+# Prerequisites:
+#   1. Run from the repository root with the project environment activated.
+#   2. Install requirements.txt and any system GDAL/Earth Engine dependencies.
+#   3. Verify every input path and available disk/GPU resources before starting.
+#
+# AOI adaptation:
+#   Replace band paths with aligned reflectance rasters for the target AOI and keep nodata masks, grid geometry, and scale factors consistent.
+#   Keep CRS, resolution, nodata, feature order, class IDs, and split metadata
+#   consistent across all scripts invoked by this runner.
+#
+# Reproducible example:
+#   bash scripts/s2_indices/run_calculate_s2_10indices_multiyear.sh
+#
+# Outputs and logs are controlled by the variables below. Use a new output/log
+# location for a new AOI, retain the run manifest, and inspect failures before
+# resuming. Existing usage notes and worked commands below remain authoritative.
+# ==============================================================================
 set -Eeuo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

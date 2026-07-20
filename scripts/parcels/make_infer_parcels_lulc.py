@@ -85,6 +85,29 @@ python scripts/parcels/make_infer_parcels_lulc.py \
     --legend-y-frac -0.06 \
     --zoom-inset-x-frac 0.15 \
     --zoom-inset-y-frac 0.60
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Transfer pixel-level inferred classes to parcel geometries and parcel summaries.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--year``, ``--seed``, ``--upazila-parcels``, ``--input``, ``--parcels``, ``--north-arrow``, ``--palette``, ``--add-title``, ``--output-plot``, ``--output-gpkg``, ``--output-png``, ``--scalebar-x-frac``, ``--scalebar-y-frac``, ``--north-arrow-x-frac``, ``--north-arrow-y-frac``, ``--legend-x-frac``, ``--legend-y-frac``, ``--zoom-inset-x-frac``, ``--zoom-inset-y-frac``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace parcel geometry, inferred LULC raster, upazila name, and output paths; use a projected CRS for parcel-area calculations.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

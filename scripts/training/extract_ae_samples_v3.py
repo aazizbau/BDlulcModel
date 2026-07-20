@@ -28,6 +28,29 @@ Example:
     --min-val-frac-per-class 0.02 \
     --block-size-m 1000 \
     --erode-px 1
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Extract spatially split samples, train a classifier, or orchestrate hyperparameter experiments.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--ae``, ``--labels-dir``, ``--upazilas``, ``--output``, ``--max-per-class-per-upazila``, ``--val-frac``, ``--min-val-per-class``, ``--min-val-frac-per-class``, ``--block-size-m``, ``--seed``, ``--label-nodata``, ``--ae-nodata``, ``--chunk``, ``--erode-px``, ``--min-nonzero-bands``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace NPZ/raster/vector inputs with samples extracted from the new AOI, preserve spatially disjoint splits, and review class IDs, feature order, block size, budgets, and random seeds.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

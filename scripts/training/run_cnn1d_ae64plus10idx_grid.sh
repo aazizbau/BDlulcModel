@@ -1,4 +1,27 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# Reproduction and AOI adaptation
+# ==============================================================================
+# Purpose: Run cnn1d ae64plus10idx grid.
+# Workflow role: Extract spatially split samples, train a classifier, or orchestrate hyperparameter experiments.
+#
+# Prerequisites:
+#   1. Run from the repository root with the project environment activated.
+#   2. Install requirements.txt and any system GDAL/Earth Engine dependencies.
+#   3. Verify every input path and available disk/GPU resources before starting.
+#
+# AOI adaptation:
+#   Replace NPZ/raster/vector inputs with samples extracted from the new AOI, preserve spatially disjoint splits, and review class IDs, feature order, block size, budgets, and random seeds.
+#   Keep CRS, resolution, nodata, feature order, class IDs, and split metadata
+#   consistent across all scripts invoked by this runner.
+#
+# Reproducible example:
+#   bash scripts/training/run_cnn1d_ae64plus10idx_grid.sh
+#
+# Outputs and logs are controlled by the variables below. Use a new output/log
+# location for a new AOI, retain the run manifest, and inspect failures before
+# resuming. Existing usage notes and worked commands below remain authoritative.
+# ==============================================================================
 set -euo pipefail
 
 # ============================================================

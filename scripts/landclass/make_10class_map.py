@@ -14,6 +14,29 @@ Notes:
     - class10_source ("maj_class/sub_class")
 - Drops features that cannot be mapped only if --drop-unmapped is passed.
   Otherwise, keeps them and labels class10_name="UNMAPPED".
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Build or harmonize the ten-class coastal LULC classification layer.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--upazila``, ``--output``, ``--layer``, ``--out-layer``, ``--drop-unmapped``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace source classes and AOI paths, and explicitly document any new mapping into the ten-class scheme.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

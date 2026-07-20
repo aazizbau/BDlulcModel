@@ -5,6 +5,29 @@ using GDAL VRT + single gdalwarp -tap (pixel-aligned).
 Usage:
   python scripts/sentinel/mosaic_sentinel_tiles.py --year 2017 --band B02 --source-resolution 10 --resolution 10
   python scripts/sentinel/mosaic_sentinel_tiles.py --year 2017 --band B11 --source-resolution 20 --resolution 10
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Mosaic Sentinel-2 tiles and harmonize their projection, resolution, and extent.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--base-dir``, ``--year``, ``--band``, ``--source-resolution``, ``--resolution``, ``--target-crs``, ``--resampling``, ``--gdal-cache-mb``, ``--output``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace tile directories and AOI/grid settings; choose bilinear/cubic processing for continuous reflectance and never use it for categorical labels.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

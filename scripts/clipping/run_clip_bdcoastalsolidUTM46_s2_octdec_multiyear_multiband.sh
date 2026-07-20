@@ -1,4 +1,27 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# Reproduction and AOI adaptation
+# ==============================================================================
+# Purpose: Run clip bdcoastalsolidUTM46 s2 octdec multiyear multiband.
+# Workflow role: Clip or reproject raster products to the coastal study boundary and analysis grid.
+#
+# Prerequisites:
+#   1. Run from the repository root with the project environment activated.
+#   2. Install requirements.txt and any system GDAL/Earth Engine dependencies.
+#   3. Verify every input path and available disk/GPU resources before starting.
+#
+# AOI adaptation:
+#   Replace the boundary vector and source raster paths. Select a projected CRS appropriate for the new AOI before area, distance, or 10 m grid operations.
+#   Keep CRS, resolution, nodata, feature order, class IDs, and split metadata
+#   consistent across all scripts invoked by this runner.
+#
+# Reproducible example:
+#   bash scripts/clipping/run_clip_bdcoastalsolidUTM46_s2_octdec_multiyear_multiband.sh
+#
+# Outputs and logs are controlled by the variables below. Use a new output/log
+# location for a new AOI, retain the run manifest, and inspect failures before
+# resuming. Existing usage notes and worked commands below remain authoritative.
+# ==============================================================================
 set -euo pipefail
 
 # Run clipping for multiple years and bands:

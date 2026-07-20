@@ -36,6 +36,29 @@ python scripts/visualization/visualize_sixlulc_transition_2017vs2024.py \
     --outptut-plot-map5 outputs/figures/lulc_transition_2017_vs_2024_map5_ecological_recovery.png \
     --outptut-plot-map6 outputs/figures/lulc_transition_2017_vs_2024_map6_ecological_degradation.png \
     --output-csv outputs/figures/lulc_transition_2017_vs_2024_sixmaps.csv
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Turn prepared rasters, vectors, and tables into thesis-ready figures.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--input``, ``--zone-map``, ``--sundarbans-map``, ``--north-arrow``, ``--palette``, ``--outdir``, ``--add-title``, ``--outptut-plot-map1``, ``--outptut-plot-map2``, ``--outptut-plot-map3``, ``--outptut-plot-map4``, ``--outptut-plot-map5``, ``--outptut-plot-map6``, ``--output-csv``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace raster/vector/palette paths with target-AOI products and verify matching CRS, extent, class IDs, units, and map annotations before publication.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

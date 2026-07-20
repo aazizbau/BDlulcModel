@@ -4,6 +4,28 @@ Check hierarchical land-class frequency for an upazila GPKG.
 Example use: 
 python scripts/data_check/check_landclass_frequency.py --upazila manpura
 
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Inspect source or intermediate datasets before they enter downstream processing.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--upazila``, ``--gpkg``, ``--layer``, ``--output``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Point the inspection arguments or path constants at the candidate AOI datasets and confirm CRS, schema, class IDs, nodata, and dimensions before continuing.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

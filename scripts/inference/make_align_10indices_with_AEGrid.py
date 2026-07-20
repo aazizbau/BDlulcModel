@@ -20,6 +20,29 @@ Explicit output folder:
 python scripts/inference/make_align_10indices_with_AEGrid.py \
     --year 2024 \
     --outdir data/interim/ae_aligned_indices_2024_fullcoast
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Prepare inference features, apply the selected classifier, or derive classified-map change products.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--year``, ``--ae``, ``--interim-dir``, ``--outdir``, ``--src-nodata``, ``--dst-nodata``, ``--resampling``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace feature rasters and AOI paths, but keep every feature on the exact training grid and use a checkpoint trained with the same feature order and class mapping.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

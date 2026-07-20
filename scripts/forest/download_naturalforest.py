@@ -4,6 +4,29 @@ Download the 2020 natural forest probability map for the Bangladesh coastal AOI.
 Usage:
     python scripts/forest/download_naturalforest.py \
         --output data/raw/forest/bd_coastal_naturalforest_2020.tif
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Download, validate, and mosaic natural-forest reference data.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--output``, ``--project``, ``--crs``, ``--scale``, ``--tile-width-km``, ``--tile-height-km``, ``--tile-overlap-km``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace Earth Engine project/AOI settings and local tile directories, then verify complete tile coverage before mosaicking.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

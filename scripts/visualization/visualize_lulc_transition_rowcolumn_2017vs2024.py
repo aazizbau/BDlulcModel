@@ -26,6 +26,29 @@ Output
 Example
 -------
 python scripts/visualization/visualize_lulc_transition_rowcolumn_2017vs2024.py
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Turn prepared rasters, vectors, and tables into thesis-ready figures.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--b2-2017``, ``--b3-2017``, ``--b4-2017``, ``--b2-2024``, ``--b3-2024``, ``--b4-2024``, ``--lulc-2017``, ``--lulc-2024``, ``--output-fig``, ``--seed``, ``--window``, ``--window-width-px``, ``--window-height-px``, ``--max-attempts``, ``--n-rows``, ``--dpi``, ``--add-main-title``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace raster/vector/palette paths with target-AOI products and verify matching CRS, extent, class IDs, units, and map annotations before publication.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

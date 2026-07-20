@@ -1,5 +1,34 @@
 """
 Mosaic Sentinel-2 L2A band tiles into a single GeoTIFF for a given year/band/resolution.
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Mosaic Sentinel-2 tiles and harmonize their projection, resolution, and extent.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--base-dir``, ``--year``, ``--band``, ``--resolution``, ``--output``, ``--gdal-cache-mb``, ``--progress-interval``, ``--target-crs``, ``--resampling``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace tile directories and AOI/grid settings; choose bilinear/cubic processing for continuous reflectance and never use it for categorical labels.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
+
+Reproducible invocation
+~~~~~~~~~~~~~~~~~~~~~~~
+Inspect the complete interface before supplying AOI-specific paths::
+
+    python scripts/sentinel/mosaic_sentinel_tiles.py --help
 """
 
 from __future__ import annotations

@@ -10,6 +10,29 @@ Complete example run:
         --input-vector assets/maps/manpura_landuse.gpkg \
         --output-epsg 4326 \
         --output-vector assets/maps/manpura_dissolved.gpkg
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Prepare upazila boundaries or maps for local-area analysis.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--input-vector``, ``--output-epsg``, ``--output-vector``, ``--name``, ``--layer``, ``--keep-holes``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Replace administrative/coastal vectors and label fields, and choose a projected CRS suited to the target region for geometry cleanup and map measurements.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations

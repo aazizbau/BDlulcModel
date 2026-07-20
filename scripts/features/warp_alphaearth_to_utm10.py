@@ -9,6 +9,29 @@ Example:
   python scripts/features/warp_alphaearth_to_utm10.py \
     --input data/processed/features/bd_coastal_alphaearth_2023_clipped.tif \
     --output data/processed/features/bd_coastal_alphaearth_2023_utm46.tif
+
+Reproduction and AOI adaptation
+-------------------------------
+Workflow role: Align and prepare predictor rasters on the common machine-learning grid.
+
+Run commands from the repository root after activating the project environment and
+installing ``requirements.txt``. Keep immutable raw inputs separate from generated
+intermediate and output products, and create a new output directory for each AOI/run.
+
+Interface and data contract
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The command-line interface exposes ``--input``, ``--output``, ``--dst-crs``, ``--res``, ``--resampling``, ``--threads``, ``--dtype``, ``--src-nodata``, ``--dst-nodata``, ``--overwrite``. Run the ``--help`` command below for required values, defaults, and accepted choices.
+Inputs must exist before execution. Outputs are written to the CLI destinations or
+to the path constants/defaults documented above and in the parser. Preserve CRS,
+transform, resolution, nodata, band/feature order, and class IDs between dependent
+stages; those properties are part of the analytical data contract.
+
+Adapting to another area of interest
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Use the target AOI reference raster as the authoritative transform, CRS, dimensions, resolution, and nodata grid.
+Record the replacement AOI, acquisition dates, CRS, resolution, class mapping, random
+seed, and software environment. Validate intermediate dimensions/statistics and inspect
+final maps or tables before using them in analysis or publication.
 """
 
 from __future__ import annotations
