@@ -13,11 +13,9 @@ BDlulcModel/
 ├── assets/                 # project-ready figures, maps, and media
 ├── configs/                # YAML/JSON configs for GEE, training, inference
 ├── data/                   # raw/processed rasters, labels, and ancillary layers
-├── docs/                   # requirements, references, design notes
 ├── notebooks/              # exploratory & prototyping notebooks
 ├── scripts/                # CLI utilities (GEE downloaders, data prep, modeling)
 ├── src/                    # importable Python modules
-├── tests/                  # regression/unit tests
 └── README.md               # you are here
 ```
 Each data subfolder contains `.gitkeep` placeholders so that the directory structure remains under version control even though the heavy artifacts themselves are ignored.
