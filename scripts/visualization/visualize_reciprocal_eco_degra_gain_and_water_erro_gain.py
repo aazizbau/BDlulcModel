@@ -172,9 +172,11 @@ MAP_SPECS = {
     "reciprocal_water_land_gain": {
         "map_label": "Reciprocal Water Gain and Land Gain",
         "category_1_label": "Water Gain / Expansion",
+        "category_1_legend_label": "Water Erosion / Expansion",
         "category_1_direction": "water_gain",
         "category_1_color": WATER_GAIN_COLOR,
         "category_2_label": "Land Gain / Water Loss",
+        "category_2_legend_label": "Land Gain",
         "category_2_direction": "land_gain",
         "category_2_color": LAND_GAIN_COLOR,
         "net_label": "Net Water Gain (water gain minus land gain)",
@@ -661,12 +663,16 @@ def render_map(
             Patch(
                 facecolor=str(spec["category_1_color"]),
                 edgecolor=main_text_color,
-                label=str(spec["category_1_label"]),
+                label=str(
+                    spec.get("category_1_legend_label", spec["category_1_label"])
+                ),
             ),
             Patch(
                 facecolor=str(spec["category_2_color"]),
                 edgecolor=main_text_color,
-                label=str(spec["category_2_label"]),
+                label=str(
+                    spec.get("category_2_legend_label", spec["category_2_label"])
+                ),
             ),
             Patch(
                 facecolor=OTHER_CHANGE_COLOR,
