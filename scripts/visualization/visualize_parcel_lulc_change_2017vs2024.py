@@ -56,6 +56,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import textwrap
 from pathlib import Path
 
 import matplotlib.colors as mcolors
@@ -63,6 +64,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from matplotlib.patches import PathPatch, Rectangle, Wedge, Patch
 from matplotlib.path import Path as MplPath
+from matplotlib.text import Text
 import numpy as np
 import pandas as pd
 
@@ -199,6 +201,22 @@ def style_axis(ax, palette: dict, grid_axis: str = "y") -> None:
         ax.set_axisbelow(True)
 
 
+def double_height_figsize(figsize: tuple[float, float]) -> tuple[float, float]:
+    """Return a figure size with its original width and twice its height."""
+    return figsize[0], figsize[1] * 2.0
+
+
+def double_figure_text(fig) -> None:
+    """Double every existing text object's font size in a figure."""
+    for text in fig.findobj(match=Text):
+        text.set_fontsize(text.get_fontsize() * 2.0)
+
+
+def wrapped_label(label: str, width: int = 20) -> str:
+    """Wrap a class label without changing its wording."""
+    return "\n".join(textwrap.wrap(str(label), width=width))
+
+
 def save_area_bar_chart(df: pd.DataFrame, upazila: str, order: list[str], palette: dict, output: Path, add_title: bool) -> Path:
     area_2017 = df.groupby("lulc_name_2017")[AREA_COL].sum().reindex(order, fill_value=0)
     area_2024 = df.groupby("lulc_name_2024")[AREA_COL].sum().reindex(order, fill_value=0)
@@ -206,25 +224,38 @@ def save_area_bar_chart(df: pd.DataFrame, upazila: str, order: list[str], palett
     x = np.arange(len(order))
     width = 0.38
 
-    fig, ax = plt.subplots(figsize=(14, 7), dpi=300, facecolor=palette["sand"])
+    fig, ax = plt.subplots(
+        figsize=double_height_figsize((14, 7)),
+        dpi=300,
+        facecolor=palette["sand"],
+    )
     ax.bar(x - width / 2, area_2017.values, width=width, label="2017", color=palette["teal_blue"])
     ax.bar(x + width / 2, area_2024.values, width=width, label="2024", color=palette["coral"])
 
     ax.set_xticks(x)
-    ax.set_xticklabels(order, rotation=35, ha="right", color=palette["deep_slate"])
+    ax.set_xticklabels(
+        [wrapped_label(label) for label in order],
+        rotation=60,
+        ha="right",
+        color=palette["deep_slate"],
+    )
     ax.set_ylabel("Total area (m²)", color=palette["deep_slate"])
     if add_title:
-        ax.set_title(f"{upazila.title()} parcel LULC area comparison: 2017 vs 2024", color=palette["deep_slate"])
+        ax.set_title(
+            f"{upazila.title()} parcel LULC area comparison\n2017 vs 2024",
+            color=palette["deep_slate"],
+        )
     leg = ax.legend(frameon=False)
     for txt in leg.get_texts():
         txt.set_color(palette["deep_slate"])
     ax.yaxis.set_major_formatter(mticker.StrMethodFormatter("{x:,.0f}"))
     style_axis(ax, palette, grid_axis="y")
 
+    double_figure_text(fig)
     fig.tight_layout()
     out = resolve_path(output)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, bbox_inches="tight", facecolor=palette["sand"])
+    fig.savefig(out, facecolor=palette["sand"])
     plt.close(fig)
     return out
 
@@ -320,10 +351,14 @@ def save_sankey(df: pd.DataFrame, upazila: str, order: list[str], palette: dict,
     left_cursor = {cls: left_pos[cls][0] for cls in order}
     right_cursor = {cls: right_pos[cls][0] for cls in order}
 
-    fig, ax = plt.subplots(figsize=(14, 9), dpi=300, facecolor=palette["sand"])
+    fig, ax = plt.subplots(
+        figsize=double_height_figsize((14, 9)),
+        dpi=300,
+        facecolor=palette["sand"],
+    )
     ax.set_facecolor(palette["sand"])
-    x_left0, x_left1 = 0.08, 0.15
-    x_right0, x_right1 = 0.85, 0.92
+    x_left0, x_left1 = 0.28, 0.33
+    x_right0, x_right1 = 0.67, 0.72
     x_flow0, x_flow1 = x_left1, x_right0
 
     for _, row in flow_order.iterrows():
@@ -351,7 +386,7 @@ def save_sankey(df: pd.DataFrame, upazila: str, order: list[str], palette: dict,
             {
                 "cls": cls,
                 "y_center": (yb + yt) / 2,
-                "text": f"{cls} ({pct:.1f}%)",
+                "text": f"{wrapped_label(cls, width=30)}\n({pct:.1f}%)",
             }
         )
 
@@ -363,14 +398,14 @@ def save_sankey(df: pd.DataFrame, upazila: str, order: list[str], palette: dict,
             {
                 "cls": cls,
                 "y_center": (yb + yt) / 2,
-                "text": f"{cls} ({pct:.1f}%)",
+                "text": f"{wrapped_label(cls, width=30)}\n({pct:.1f}%)",
             }
         )
 
     left_labels = sorted(left_labels, key=lambda item: item["y_center"])
     right_labels = sorted(right_labels, key=lambda item: item["y_center"])
-    adjusted_left = adjust_positions([item["y_center"] for item in left_labels], min_gap=0.04, y_min=0.02, y_max=0.98)
-    adjusted_right = adjust_positions([item["y_center"] for item in right_labels], min_gap=0.04, y_min=0.02, y_max=0.98)
+    adjusted_left = adjust_positions([item["y_center"] for item in left_labels], min_gap=0.09, y_min=0.05, y_max=0.95)
+    adjusted_right = adjust_positions([item["y_center"] for item in right_labels], min_gap=0.09, y_min=0.05, y_max=0.95)
 
     for item, y_adj in zip(left_labels, adjusted_left):
         y_orig = item["y_center"]
@@ -405,14 +440,20 @@ def save_sankey(df: pd.DataFrame, upazila: str, order: list[str], palette: dict,
     ax.text((x_left0 + x_left1) / 2, 1.035, "2017", ha="center", va="bottom", fontsize=13, fontweight="bold", color=palette["deep_slate"])
     ax.text((x_right0 + x_right1) / 2, 1.035, "2024", ha="center", va="bottom", fontsize=13, fontweight="bold", color=palette["deep_slate"])
     if add_title:
-        ax.set_title(f"{upazila.title()} parcel LULC transition flow (share of total area)", fontsize=14, color=palette["deep_slate"])
+        ax.set_title(
+            f"{upazila.title()} parcel LULC transition flow\n"
+            "(share of total area)",
+            fontsize=14,
+            color=palette["deep_slate"],
+        )
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.02, 1.06)
     ax.axis("off")
 
+    double_figure_text(fig)
     out = resolve_path(output)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, bbox_inches="tight", facecolor=palette["sand"])
+    fig.savefig(out, facecolor=palette["sand"])
     plt.close(fig)
     return out
 
@@ -428,7 +469,14 @@ def save_faceted_bar(df: pd.DataFrame, upazila: str, order: list[str], top_n: in
     n = len(top_types)
     ncols = 3
     nrows = math.ceil(n / ncols)
-    fig, axes = plt.subplots(nrows, ncols, figsize=(18, 4.8 * nrows), dpi=300, sharey=False, facecolor=palette["sand"])
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=double_height_figsize((18, 4.8 * nrows)),
+        dpi=300,
+        sharey=False,
+        facecolor=palette["sand"],
+    )
     axes = np.atleast_1d(axes).flatten()
 
     for ax, parcel_type in zip(axes, top_types):
@@ -441,7 +489,13 @@ def save_faceted_bar(df: pd.DataFrame, upazila: str, order: list[str], top_n: in
         ax.bar(x + width / 2, area_2024.values, width=width, label="2024", color=palette["coral"])
         ax.set_title(parcel_type, color=palette["deep_slate"])
         ax.set_xticks(x)
-        ax.set_xticklabels(order, rotation=55, ha="right", fontsize=8, color=palette["deep_slate"])
+        ax.set_xticklabels(
+            order,
+            rotation=90,
+            ha="center",
+            fontsize=8,
+            color=palette["deep_slate"],
+        )
         ax.yaxis.set_major_formatter(mticker.StrMethodFormatter("{x:,.0f}"))
         if parcel_type in {"Road", "Canal", "Halot"}:
             ymax = max(float(area_2017.max()), float(area_2024.max()))
@@ -459,13 +513,20 @@ def save_faceted_bar(df: pd.DataFrame, upazila: str, order: list[str], top_n: in
     for txt in leg.get_texts():
         txt.set_color(palette["deep_slate"])
     if add_title:
-        fig.suptitle(f"{upazila.title()} parcel-type faceted LULC area comparison: 2017 vs 2024", y=0.995, fontsize=15, color=palette["deep_slate"])
+        fig.suptitle(
+            f"{upazila.title()} parcel-type faceted LULC area comparison\n"
+            "2017 vs 2024",
+            y=0.995,
+            fontsize=15,
+            color=palette["deep_slate"],
+        )
     fig.text(0.02, 0.5, "Area (m²)", va="center", rotation=90, color=palette["deep_slate"])
+    double_figure_text(fig)
     fig.tight_layout(rect=(0.03, 0.03, 1, 0.97))
 
     out = resolve_path(output)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, bbox_inches="tight", facecolor=palette["sand"])
+    fig.savefig(out, facecolor=palette["sand"])
     plt.close(fig)
     return out
 
