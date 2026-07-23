@@ -49,7 +49,11 @@ sys.path.insert(0, str(SHARED_ROOT))
 
 from common.constants import CLASS_IDS, DEFAULT_OUTPUT_ROOT, resolve_path  # noqa: E402
 from common.plot_utils import asymmetric_yerr, wrap_label  # noqa: E402
-from test_plot_utils import add_ci_labels  # noqa: E402
+from test_plot_utils import (  # noqa: E402
+    add_ci_labels,
+    double_figure_text,
+    double_height_figsize,
+)
 
 
 METRICS = [
@@ -81,7 +85,7 @@ def main() -> None:
 
     x = np.arange(len(CLASS_IDS))
     width = 0.25
-    fig, ax = plt.subplots(figsize=(15.5, 7.5))
+    fig, ax = plt.subplots(figsize=double_height_figsize((15.5, 7.5)))
     maximum = 0.0
     for metric_index, (metric, color) in enumerate(zip(METRICS, COLORS)):
         rows = summary[summary["metric"] == metric].set_index("class_id").loc[CLASS_IDS]
@@ -108,12 +112,18 @@ def main() -> None:
         for class_id in CLASS_IDS
     ]
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, fontsize=8)
+    ax.set_xticklabels(
+        labels,
+        fontsize=8,
+        rotation=90,
+        ha="center",
+        va="top",
+    )
     ax.set_ylabel("Accuracy / Score (%)")
-    ax.set_xlabel("LULC Class")
+    ax.set_xlabel("LULC Class", labelpad=60)
     ax.set_ylim(0, max(105.0, maximum + 8.0))
     ax.grid(axis="y", linestyle="--", alpha=0.35)
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.20), ncol=3, fontsize=10)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.34), ncol=3, fontsize=10)
     if args.add_title:
         first = summary.iloc[0]
         ax.set_title(
@@ -122,8 +132,9 @@ def main() -> None:
             "spatial block bootstrap 95% confidence intervals",
             pad=14,
         )
+    double_figure_text(fig)
     fig.tight_layout()
-    fig.savefig(output, dpi=300, bbox_inches="tight")
+    fig.savefig(output, dpi=300)
     plt.close(fig)
     print(f"Saved: {output}")
 

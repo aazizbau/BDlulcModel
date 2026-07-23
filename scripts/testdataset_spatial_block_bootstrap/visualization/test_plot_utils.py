@@ -33,6 +33,7 @@ Import this helper from its parent workflow or an interactive check::
 from __future__ import annotations
 
 import matplotlib.patheffects as pe
+from matplotlib.text import Text
 
 from common.plot_utils import (
     BOUND_VALUE_COLOR,
@@ -46,6 +47,17 @@ UPPER_BOUND_VALUE_EFFECTS = [
     pe.Stroke(linewidth=1.3, foreground="#FFF2A8"),
     pe.Normal(),
 ]
+
+
+def double_height_figsize(figsize: tuple[float, float]) -> tuple[float, float]:
+    """Return a figure size with the original width and twice the height."""
+    return figsize[0], figsize[1] * 2.0
+
+
+def double_figure_text(fig) -> None:
+    """Double every existing text object's font size in a figure."""
+    for text in fig.findobj(match=Text):
+        text.set_fontsize(text.get_fontsize() * 2.0)
 
 
 def add_ci_labels(ax, bars, observed, lower, upper, fontsize: float = 6.5) -> None:

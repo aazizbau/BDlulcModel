@@ -49,7 +49,11 @@ sys.path.insert(0, str(SHARED_ROOT))
 
 from common.constants import DEFAULT_OUTPUT_ROOT, MODEL_FAMILY_ORDER, resolve_path  # noqa: E402
 from common.plot_utils import TEXT_EFFECTS, asymmetric_yerr  # noqa: E402
-from test_plot_utils import add_ci_labels  # noqa: E402
+from test_plot_utils import (  # noqa: E402
+    add_ci_labels,
+    double_figure_text,
+    double_height_figsize,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -77,7 +81,7 @@ def main() -> None:
 
     x = np.arange(len(MODEL_FAMILY_ORDER))
     width = 0.36
-    fig, ax = plt.subplots(figsize=(13.5, 7.5))
+    fig, ax = plt.subplots(figsize=double_height_figsize((13.5, 7.5)))
     series = [
         ("AE64", "observed_ae64", "ae64_lower_95", "ae64_upper_95", "#4C72B0", -width / 2),
         ("AE64 + 10 Indices", "observed_plusindices", "plusindices_lower_95", "plusindices_upper_95", "#DD8452", width / 2),
@@ -107,7 +111,8 @@ def main() -> None:
             index,
             annotation_y,
             f"Delta {row.observed_delta:+.2f} pp\n"
-            f"95% CI: {row.delta_lower_95:+.2f} to {row.delta_upper_95:+.2f}",
+            "95% CI:\n"
+            f"{row.delta_lower_95:+.2f} to {row.delta_upper_95:+.2f}",
             ha="center",
             va="bottom",
             fontsize=7.5,
@@ -126,11 +131,13 @@ def main() -> None:
         n_bootstrap = int(summary["n_bootstrap"].iloc[0])
         ax.set_title(
             "AE64 versus AE64 + 10 Spectral Indices (Test-Selected Runs)\n"
-            f"95% confidence intervals from {n_bootstrap:,} paired spatial block bootstrap replicates",
+            f"95% confidence intervals from {n_bootstrap:,} paired\n"
+            "spatial block bootstrap replicates",
             pad=14,
         )
+    double_figure_text(fig)
     fig.tight_layout()
-    fig.savefig(output, dpi=300, bbox_inches="tight")
+    fig.savefig(output, dpi=300)
     plt.close(fig)
     print(f"Saved: {output}")
 

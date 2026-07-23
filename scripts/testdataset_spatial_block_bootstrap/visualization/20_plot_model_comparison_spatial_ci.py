@@ -49,7 +49,11 @@ sys.path.insert(0, str(SHARED_ROOT))
 
 from common.constants import DEFAULT_OUTPUT_ROOT, MODEL_FAMILY_ORDER, resolve_path  # noqa: E402
 from common.plot_utils import asymmetric_yerr  # noqa: E402
-from test_plot_utils import add_ci_labels  # noqa: E402
+from test_plot_utils import (  # noqa: E402
+    add_ci_labels,
+    double_figure_text,
+    double_height_figsize,
+)
 
 
 METRIC_ORDER = ["Overall Accuracy", "Macro F1-score", "Weighted F1-score"]
@@ -77,7 +81,7 @@ def main() -> None:
 
     x = np.arange(len(MODEL_FAMILY_ORDER))
     width = 0.25
-    fig, ax = plt.subplots(figsize=(13.5, 7.2))
+    fig, ax = plt.subplots(figsize=double_height_figsize((13.5, 7.2)))
     maximum = 0.0
     for metric_index, (metric, color) in enumerate(zip(METRIC_ORDER, COLORS)):
         rows = (
@@ -113,11 +117,13 @@ def main() -> None:
         n_bootstrap = int(summary["n_bootstrap"].iloc[0])
         ax.set_title(
             "Test-Selected Model-Family Test Performance\n"
-            f"95% confidence intervals from {n_bootstrap:,} paired spatial block bootstrap replicates",
+            f"95% confidence intervals from {n_bootstrap:,} paired\n"
+            "spatial block bootstrap replicates",
             pad=14,
         )
+    double_figure_text(fig)
     fig.tight_layout()
-    fig.savefig(output, dpi=300, bbox_inches="tight")
+    fig.savefig(output, dpi=300)
     plt.close(fig)
     print(f"Saved: {output}")
 

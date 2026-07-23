@@ -56,6 +56,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.text import Text
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -139,6 +140,12 @@ def add_bar_labels(ax, bars) -> None:
         )
 
 
+def double_figure_text(fig) -> None:
+    """Double every existing text object's font size in the figure."""
+    for text in fig.findobj(match=Text):
+        text.set_fontsize(text.get_fontsize() * 2.0)
+
+
 def main() -> None:
     args = parse_args()
     csv_2017 = resolve_path(args.csv_2017)
@@ -151,7 +158,7 @@ def main() -> None:
     x = np.arange(len(MAJOR_CLASS_ORDER))
     width = 0.38
 
-    fig, ax = plt.subplots(figsize=(14, 7))
+    fig, ax = plt.subplots(figsize=(14, 14))
     bars_2017 = ax.bar(x - width / 2, area_2017.values, width=width, label="2017")
     bars_2024 = ax.bar(x + width / 2, area_2024.values, width=width, label="2024")
 
@@ -159,7 +166,12 @@ def main() -> None:
     add_bar_labels(ax, bars_2024)
 
     if args.add_title:
-        ax.set_title(f"Major LULC Class Areas in the {ZONE_TITLES[args.zone]}, 2017 and 2024", fontsize=14, pad=14)
+        ax.set_title(
+            "Major LULC Class Areas\n"
+            f"in the {ZONE_TITLES[args.zone]}, 2017 and 2024",
+            fontsize=14,
+            pad=14,
+        )
     ax.set_ylabel("Area (km²)", fontsize=12)
     ax.set_xlabel("LULC class", fontsize=12)
     ax.set_xticks(x)
@@ -171,8 +183,9 @@ def main() -> None:
     ax.set_ylim(0, max_height * 1.12)
 
     output_plot.parent.mkdir(parents=True, exist_ok=True)
+    double_figure_text(fig)
     fig.tight_layout()
-    fig.savefig(output_plot, dpi=300, bbox_inches="tight")
+    fig.savefig(output_plot, dpi=300)
     plt.close(fig)
 
     print(f"Saved: {output_plot}")
