@@ -124,6 +124,8 @@ LULC_COLORS = {
 TITLE_FONTSIZE = 20
 YEAR_LABEL_FONTSIZE = 18
 CLASS_LABEL_FONTSIZE = 10
+TEXT_SCALE = 2
+FIGURE_SIZE = (16, 22)
 
 
 def resolve_path(path: Path) -> Path:
@@ -351,11 +353,11 @@ def save_sankey(
     bg = palette.get("sand", "#FFF9EF")
     tc = palette.get("deep_slate", "#2D3142")
 
-    fig, ax = plt.subplots(figsize=(16, 11), dpi=300, facecolor=bg)
+    fig, ax = plt.subplots(figsize=FIGURE_SIZE, dpi=300, facecolor=bg)
     ax.set_facecolor(bg)
 
-    xl0, xl1 = 0.07, 0.14
-    xr0, xr1 = 0.86, 0.93
+    xl0, xl1 = 0.15, 0.22
+    xr0, xr1 = 0.78, 0.85
 
     for _, row in df.sort_values(["class_2017", "class_2024"]).iterrows():
         s, d = row["class_2017"], row["class_2024"]
@@ -408,10 +410,10 @@ def save_sankey(
         if abs(ya - y_orig) > 0.002:
             ax.plot([xl0, tx + 0.003], [y_orig, ya], color=LULC_COLORS[item["c"]], lw=1.2, alpha=0.75)
         ax.text(tx, ya, item["text"], ha="right", va="center",
-                fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
+                fontsize=CLASS_LABEL_FONTSIZE * TEXT_SCALE, color=tc, linespacing=1.35, zorder=3)
     for item in litems_fixed:
         ax.text(xl0 - 0.012, item["yc"], item["text"], ha="right", va="center",
-                fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
+                fontsize=CLASS_LABEL_FONTSIZE * TEXT_SCALE, color=tc, linespacing=1.35, zorder=3)
 
     ritems_adj = [it for it in ritems if it["c"] not in NO_CONNECTOR]
     ritems_fixed = [it for it in ritems if it["c"] in NO_CONNECTOR]
@@ -422,23 +424,23 @@ def save_sankey(
         if abs(ya - y_orig) > 0.002:
             ax.plot([xr1, tx - 0.003], [y_orig, ya], color=LULC_COLORS[item["c"]], lw=1.2, alpha=0.75)
         ax.text(tx, ya, item["text"], ha="left", va="center",
-                fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
+                fontsize=CLASS_LABEL_FONTSIZE * TEXT_SCALE, color=tc, linespacing=1.35, zorder=3)
     for item in ritems_fixed:
         ax.text(xr1 + 0.012, item["yc"], item["text"], ha="left", va="center",
-                fontsize=CLASS_LABEL_FONTSIZE, color=tc, linespacing=1.35, zorder=3)
+                fontsize=CLASS_LABEL_FONTSIZE * TEXT_SCALE, color=tc, linespacing=1.35, zorder=3)
 
     ax.text((xl0 + xl1) / 2, 1.050, "2017",
-            ha="center", va="bottom", fontsize=YEAR_LABEL_FONTSIZE, fontweight="bold", color=tc)
+            ha="center", va="bottom", fontsize=YEAR_LABEL_FONTSIZE * TEXT_SCALE, fontweight="bold", color=tc)
     ax.text((xr0 + xr1) / 2, 1.050, "2024",
-            ha="center", va="bottom", fontsize=YEAR_LABEL_FONTSIZE, fontweight="bold", color=tc)
+            ha="center", va="bottom", fontsize=YEAR_LABEL_FONTSIZE * TEXT_SCALE, fontweight="bold", color=tc)
     if add_title:
-        ax.set_title(title, fontsize=TITLE_FONTSIZE, color=tc, pad=24)
+        ax.set_title(title, fontsize=TITLE_FONTSIZE * TEXT_SCALE, color=tc, pad=24)
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.04, 1.12)
     ax.axis("off")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, bbox_inches="tight", facecolor=bg, dpi=300)
+    fig.savefig(out_path, facecolor=bg, dpi=300)
     plt.close(fig)
     print(f"  Saved: {out_path}")
 
@@ -482,7 +484,7 @@ def main() -> None:
 
     save_sankey(
         build_transition_df(counts),
-        "Bangladesh Coastal LULC Change: 2017 → 2024  —  Sundarbans",
+        "Bangladesh Coastal LULC Change: 2017 → 2024\nSundarbans",
         output_plot,
         palette,
         args.add_title,
