@@ -172,7 +172,7 @@ MAP_SPECS = {
     "reciprocal_water_land_gain": {
         "map_label": "Reciprocal Water Gain and Land Gain",
         "category_1_label": "Water Gain / Expansion",
-        "category_1_legend_label": "Water Erosion / Expansion",
+        "category_1_legend_label": "Water Expansion / Erosion",
         "category_1_direction": "water_gain",
         "category_1_color": WATER_GAIN_COLOR,
         "category_2_label": "Land Gain / Water Loss",
